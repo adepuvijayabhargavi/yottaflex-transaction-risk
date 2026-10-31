@@ -1,0 +1,15 @@
+{
+  "profile": "pilot",
+  "seed": 20261022,
+  "reference_datetime_utc": "2026-10-30T00:00:00+00:00",
+  "targets": {
+    "customers": 100,
+    "accounts": 150,
+    "merchants": 50,
+    "devices": 300,
+    "transfer_groups": 100,
+    "transactions": 2000,
+    "alerts": 20,
+    "risk_rules": 12
+  }
+}

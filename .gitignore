@@ -1,0 +1,61 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+config.local.*
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Flask
+instance/
+*.sqlite
+*.sqlite3
+*.db
+
+# Testing and quality
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+.cache/
+
+# Generated datasets and exports
+exports/csv/*
+exports/json/*
+exports/sql/*
+!exports/csv/.gitkeep
+!exports/json/.gitkeep
+!exports/sql/.gitkeep
+generated/
+data/generated/
+*.csv.gz
+*.jsonl.gz
+*.sql.gz
+*.zip
+
+# Logs and editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,1 @@
+"""Individual risk detection rules."""

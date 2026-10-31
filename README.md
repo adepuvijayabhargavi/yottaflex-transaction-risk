@@ -1,0 +1,104 @@
+# YottaFlex Transaction Risk Monitoring and Analyst Review System
+
+Phase 1 established the Flask project scaffold, configuration, database extension wiring, and a basic health check. Phase 2 adds the core and evaluation model definitions. Phase 3 adds cross-table validation services and the five required edge-case checks. Phase 4 adds the applied core/evaluation migrations and the deterministic pilot dataset generator, reset, checksum, and verification services.
+
+## Requirements
+
+- Python 3.11+
+- MySQL 8 or the locally installed MySQL 9.1 server
+- A project-local virtual environment
+
+## Local Setup
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+```
+
+Edit `.env` locally with your own role-specific database settings and a locally generated secret key. Do not commit `.env`. See `docs/migrations.md` for the separate core and evaluation migration commands.
+
+Generate a local secret key with:
+
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+## Run the Application
+
+```powershell
+.\.venv\Scripts\python.exe run.py
+```
+
+Open:
+
+- `http://127.0.0.1:5000/health`
+- `http://127.0.0.1:5000/api/v1/health`
+
+## Role-Specific Database URLs
+
+Each process uses only the credential it needs:
+
+| Role | Environment variable |
+|---|---|
+| Web application | `YTF_APP_DATABASE_URL` |
+| Risk engine | `YTF_RISK_DATABASE_URL` |
+| Synthetic generator | `YTF_GENERATOR_DATABASE_URL` |
+| Evaluation ground truth | `YTF_EVAL_DATABASE_URL` |
+| Evaluation core results | `YTF_EVAL_CORE_DATABASE_URL` |
+| Core migrations | `YTF_MIGRATION_DATABASE_URL` |
+| Evaluation migrations | `YTF_EVAL_MIGRATION_DATABASE_URL` |
+
+The evaluation ground-truth and core-results URLs must remain separate. The web
+application and risk engine never receive evaluation credentials.
+
+## Pilot Dataset Commands
+
+Generate the approved pilot dataset (`seed=20261022`) and its isolated ground
+truth:
+
+```powershell
+.\.venv\Scripts\flask.exe pilot generate --profile pilot --seed 20261022
+```
+
+Preview, then confirm, a run reset without deleting versioned risk rules:
+
+```powershell
+.\.venv\Scripts\flask.exe pilot reset --profile pilot --seed 20261022 --dry-run
+.\.venv\Scripts\flask.exe pilot reset --profile pilot --seed 20261022 --confirm
+```
+
+Verify counts, labels, balances, transfer reconciliation, schema isolation, and
+stored checksums:
+
+```powershell
+.\.venv\Scripts\flask.exe pilot verify --profile pilot --seed 20261022
+```
+
+The generator and reset commands use `YTF_GENERATOR_DATABASE_URL`. Verification
+uses the generator URL for source and ground-truth reads and the read-only
+`YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 20 fraud
+labels and zero alerts. Alerts are created only by the Phase 5 risk engine.
+
+## Run Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+## Phase Status
+
+Phase 1 foundation, Phase 2 model/schema definitions, Phase 3 validation
+services, and the Phase 4 migration/generator implementation are complete. The
+core and evaluation migrations are applied (`yottaflex` has 20 tables including
+`alembic_version`; `yottaflex_eval` has `ground_truth` and `alembic_version`).
+The deterministic generator, safe reset, canonical checksums, and verification
+services are implemented and covered by the test suite.
+
+Phase 4 MySQL pilot execution is complete and awaiting final approval. The
+approved table grants were applied, `ytf_eval_core` was created, and isolation
+was verified. The pilot generated the approved counts, produced zero alerts,
+and reproduced identical checksums after a confirmed reset and regeneration.
+Risk scoring, alert workflows, and APIs remain intentionally unimplemented
+until Phase 4 is approved.

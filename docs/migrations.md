@@ -1,0 +1,146 @@
+# Independent Database Migrations
+
+YottaFlex has two independent schemas, two SQLAlchemy metadata objects, two
+migration histories, and two migration credentials.
+
+- Core schema: `yottaflex`
+- Evaluation schema: `yottaflex_eval`
+
+The core schema and the evaluation schema must never share a migration history
+or a migration database URL.
+
+## Migration Architecture
+
+| Item | Core | Evaluation |
+| --- | --- | --- |
+| Flask-Migrate directory | `migrations/` | `migrations_eval/` |
+| SQLAlchemy metadata | `app.models.Base.metadata` | `app.evaluation.EvaluationBase.metadata` |
+| Tables | 19 core tables | `ground_truth` only |
+| Revision files | `migrations/versions/` | `migrations_eval/versions/` |
+| Alembic version table | `yottaflex.alembic_version` | `yottaflex_eval.alembic_version` |
+| Database URL variable | `YTF_MIGRATION_DATABASE_URL` | `YTF_EVAL_MIGRATION_DATABASE_URL` |
+
+Each `env.py` also validates its metadata before running. Core migrations stop
+with an error if a non-`yottaflex` table is present. Evaluation migrations stop
+with an error if a non-`yottaflex_eval` table is present.
+
+The Flask application, risk engine, evaluation tooling, and migrations use
+different database roles. Migration credentials are used only by migration
+commands.
+
+## Required Environment Variables
+
+Set these values locally in `.env`. Never commit `.env` or real credentials.
+
+| Role | Environment variable | Expected schema |
+| --- | --- | --- |
+| Web application | `YTF_APP_DATABASE_URL` | `yottaflex` |
+| Risk engine | `YTF_RISK_DATABASE_URL` | `yottaflex` |
+| Evaluation ground truth | `YTF_EVAL_DATABASE_URL` | `yottaflex_eval` |
+| Evaluation core results | `YTF_EVAL_CORE_DATABASE_URL` | `yottaflex` |
+| Synthetic generator | `YTF_GENERATOR_DATABASE_URL` | `yottaflex` |
+| Core migrations | `YTF_MIGRATION_DATABASE_URL` | `yottaflex` |
+| Evaluation migrations | `YTF_EVAL_MIGRATION_DATABASE_URL` | `yottaflex_eval` |
+
+`YTF_DATABASE_URL` is accepted only as a legacy fallback for the web
+application. It is never used for migrations.
+
+`YTF_EVAL_CORE_DATABASE_URL` uses the read-only `ytf_eval_core` account for
+evaluation results. It is not a migration URL.
+
+Use `YTF_MIGRATION_DATABASE_URL` only with `migrations/`.
+Use `YTF_EVAL_MIGRATION_DATABASE_URL` only with `migrations_eval/`.
+
+## Generate Core Migrations
+
+After the local `.env` contains the core migration URL:
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations migrate -m "describe core change"
+```
+
+This command compares metadata with the live database, so it requires a working
+MySQL connection. Review the generated file in `migrations/versions/` before
+applying it. Confirm that it changes only `yottaflex` tables.
+
+## Apply Core Migrations
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations upgrade head
+```
+
+## Generate Evaluation Migrations
+
+After the local `.env` contains the evaluation migration URL:
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations_eval migrate -m "describe evaluation change"
+```
+
+This command compares metadata with the live database, so it requires a working
+MySQL connection. Review the generated file in `migrations_eval/versions/`.
+Confirm that it changes only `yottaflex_eval.ground_truth`.
+
+## Apply Evaluation Migrations
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations_eval upgrade head
+```
+
+## Inspect Migration History
+
+Core:
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations history
+.\.venv\Scripts\flask.exe db -d migrations heads
+.\.venv\Scripts\flask.exe db -d migrations current
+.\.venv\Scripts\flask.exe db -d migrations show <revision>
+```
+
+Evaluation:
+
+```powershell
+.\.venv\Scripts\flask.exe db -d migrations_eval history
+.\.venv\Scripts\flask.exe db -d migrations_eval heads
+.\.venv\Scripts\flask.exe db -d migrations_eval current
+.\.venv\Scripts\flask.exe db -d migrations_eval show <revision>
+```
+
+`current` checks the database connection. `history`, `heads`, and the offline
+commands below can be used without a MySQL connection when the relevant
+environment variable is set.
+
+## Offline Environment Check
+
+Offline mode builds migration SQL without opening a database connection. Use a
+placeholder URL; do not put a real password in terminal history.
+
+```powershell
+$env:YTF_MIGRATION_DATABASE_URL = "mysql+pymysql://placeholder@localhost/yottaflex"
+.\.venv\Scripts\flask.exe db -d migrations upgrade --sql
+
+$env:YTF_EVAL_MIGRATION_DATABASE_URL = "mysql+pymysql://placeholder@localhost/yottaflex_eval"
+.\.venv\Scripts\flask.exe db -d migrations_eval upgrade --sql
+```
+
+## Avoid Cross-Schema Migrations
+
+Follow all of these rules:
+
+1. Use `-d migrations` only with `YTF_MIGRATION_DATABASE_URL`.
+2. Use `-d migrations_eval` only with `YTF_EVAL_MIGRATION_DATABASE_URL`.
+3. Never point the core migration URL at `yottaflex_eval`.
+4. Never point the evaluation migration URL at `yottaflex`.
+5. Do not copy revision files between `migrations/versions/` and
+   `migrations_eval/versions/`.
+6. Review every autogenerated file before applying it.
+7. Keep the migration users separate from application and risk-engine users.
+
+The metadata validation in each `env.py` is a final safety check. It is not a
+substitute for using the correct URL and directory.
+
+## Step 2.5 Boundary
+
+Step 2.5 prepared and inspected both environments. It did not connect to MySQL,
+create tables, generate revision files, or apply migrations.
