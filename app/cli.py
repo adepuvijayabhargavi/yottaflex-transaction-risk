@@ -123,7 +123,144 @@ def verify_command(
         raise click.exceptions.Exit(1)
 
 
+@click.group("risk")
+def risk_cli() -> None:
+    """Evaluate transactions, score risk, and generate alerts."""
+
+
+@risk_cli.command("evaluate")
+@click.option(
+    "--model-version",
+    default="v1.0.0",
+    show_default=True,
+    help="Risk model version string.",
+)
+@click.option(
+    "--threshold",
+    type=int,
+    default=None,
+    help="Alert score threshold override (defaults to YTF_ALERT_THRESHOLD=40).",
+)
+@click.option(
+    "--batch-size",
+    type=int,
+    default=100,
+    show_default=True,
+    help="Processing batch size.",
+)
+def evaluate_command(
+    model_version: str,
+    threshold: int | None,
+    batch_size: int,
+) -> None:
+    """Evaluate transactions, produce explainable findings, and generate alerts."""
+    from flask import current_app
+
+    from app.services.risk_engine import run_risk_evaluation
+
+    default_threshold = current_app.config.get("YTF_ALERT_THRESHOLD", 40)
+    summary = run_risk_evaluation(
+        model_version=model_version,
+        threshold=threshold,
+        batch_size=batch_size,
+        default_threshold=default_threshold,
+    )
+    _echo(summary.to_dict())
+
+
+@risk_cli.command("status")
+@click.option("--model-version", default="v1.0.0", show_default=True)
+def status_command(model_version: str) -> None:
+    """Inspect assessment, finding, and alert counts for a model version."""
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import Session
+
+    from app.database import DatabaseRole, database_url_for_role
+    from app.models import Alert, RiskAssessment, RiskFinding
+
+    url = database_url_for_role(DatabaseRole.APP)
+    assert url is not None
+    engine = create_engine(url, pool_pre_ping=True)
+    with Session(engine) as session:
+        assessments_count = (
+            session.scalar(
+                select(func.count(RiskAssessment.id)).where(
+                    RiskAssessment.model_version == model_version
+                )
+            )
+            or 0
+        )
+        findings_count = (
+            session.scalar(
+                select(func.count(RiskFinding.id))
+                .join(
+                    RiskAssessment,
+                    RiskFinding.assessment_id == RiskAssessment.id,
+                )
+                .where(RiskAssessment.model_version == model_version)
+            )
+            or 0
+        )
+        alerts_count = (
+            session.scalar(
+                select(func.count(Alert.id))
+                .join(
+                    RiskAssessment,
+                    Alert.assessment_id == RiskAssessment.id,
+                )
+                .where(RiskAssessment.model_version == model_version)
+            )
+            or 0
+        )
+
+        levels = dict(
+            session.execute(
+                select(RiskAssessment.risk_level, func.count(RiskAssessment.id))
+                .where(RiskAssessment.model_version == model_version)
+                .group_by(RiskAssessment.risk_level)
+            ).all()
+        )
+        priorities = dict(
+            session.execute(
+                select(Alert.priority, func.count(Alert.id))
+                .join(
+                    RiskAssessment,
+                    Alert.assessment_id == RiskAssessment.id,
+                )
+                .where(RiskAssessment.model_version == model_version)
+                .group_by(Alert.priority)
+            ).all()
+        )
+    engine.dispose()
+    _echo(
+        {
+            "model_version": model_version,
+            "assessments": assessments_count,
+            "findings": findings_count,
+            "alerts": alerts_count,
+            "risk_levels": {
+                k.value if hasattr(k, "value") else str(k): v for k, v in levels.items()
+            },
+            "alert_priorities": {
+                k.value if hasattr(k, "value") else str(k): v
+                for k, v in priorities.items()
+            },
+        }
+    )
+
+
+@risk_cli.command("evaluate-metrics")
+@click.option("--model-version", default="v1.0.0", show_default=True)
+def metrics_command(model_version: str) -> None:
+    """Compute precision, recall, and F1 score against isolated ground truth."""
+    from app.evaluation.metrics import compute_evaluation_metrics
+
+    metrics = compute_evaluation_metrics(model_version=model_version)
+    _echo(metrics.to_dict())
+
+
 def register_cli(app: Flask) -> None:
     """Register application CLI commands."""
 
     app.cli.add_command(pilot_cli)
+    app.cli.add_command(risk_cli)
