@@ -19,7 +19,7 @@ _REQUIRED_TARGETS = {
     "devices",
     "transfer_groups",
     "transactions",
-    "alerts",
+    "positive_labels",
     "risk_rules",
 }
 

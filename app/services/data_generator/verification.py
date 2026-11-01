@@ -30,7 +30,7 @@ from app.services.reproducibility.checksums import compute_run_checksums
 from .generator import (
     GENERATOR_VERSION,
     OPENING_BALANCE,
-    PATTERN_COUNTS,
+    pattern_counts_for_target,
 )
 from .profiles import DatasetProfile
 
@@ -58,7 +58,7 @@ def _expected_counts(profile: DatasetProfile) -> dict[str, int]:
         "transactions": profile.target("transactions"),
         "risk_rules": profile.target("risk_rules"),
         "ground_truth": profile.target("transactions"),
-        "ground_truth_positive": sum(PATTERN_COUNTS.values()),
+        "ground_truth_positive": profile.target("positive_labels"),
         "alerts": 0,
     }
 
@@ -199,6 +199,7 @@ def _check_metadata(errors: list[str]) -> None:
 def _check_ground_truth(
     transactions: list[Transaction],
     ground_truth: list[GroundTruth],
+    expected_pattern_counts: dict[str, int],
     *,
     run_reference: str,
     prefix: str,
@@ -220,12 +221,12 @@ def _check_ground_truth(
         label.primary_pattern for label in ground_truth if label.is_fraud
     )
     actual_patterns = {
-        pattern: pattern_counts.get(pattern, 0) for pattern in PATTERN_COUNTS
+        pattern: pattern_counts.get(pattern, 0) for pattern in expected_pattern_counts
     }
-    if actual_patterns != PATTERN_COUNTS:
+    if actual_patterns != expected_pattern_counts:
         errors.append(
             "Fraud-label distribution differs from the documented patterns. "
-            f"Expected={PATTERN_COUNTS}; actual={actual_patterns}."
+            f"Expected={expected_pattern_counts}; actual={actual_patterns}."
         )
 
     for label in ground_truth:
@@ -381,6 +382,7 @@ def verify_dataset_run(
     pattern_counts = _check_ground_truth(
         list(transactions),
         list(ground_truth),
+        pattern_counts_for_target(profile.target("positive_labels")),
         run_reference=run_reference,
         prefix=prefix,
         errors=errors,

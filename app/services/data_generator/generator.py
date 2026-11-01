@@ -56,6 +56,24 @@ PATTERN_COUNTS = {
     "HIGH_VALUE_TRANSACTION": 4,
     "REPEATED_TRANSACTIONS": 3,
 }
+_BASE_POSITIVE_LABEL_COUNT = sum(PATTERN_COUNTS.values())
+
+
+def pattern_counts_for_target(positive_label_target: int) -> dict[str, int]:
+    """Scale the pilot pattern proportions to a supported positive-label target."""
+
+    if (
+        positive_label_target < _BASE_POSITIVE_LABEL_COUNT
+        or positive_label_target % _BASE_POSITIVE_LABEL_COUNT != 0
+    ):
+        raise ValueError(
+            "Positive-label target must be a positive multiple of "
+            f"{_BASE_POSITIVE_LABEL_COUNT}."
+        )
+
+    scale = positive_label_target // _BASE_POSITIVE_LABEL_COUNT
+    return {pattern: count * scale for pattern, count in PATTERN_COUNTS.items()}
+
 
 FIRST_NAMES = (
     "Aarav",
@@ -593,11 +611,19 @@ def _build_transfer_groups(
     devices_by_customer: dict[int, list[Device]],
     tx_numbers: count,
     prefix: str,
+    pattern_counts: dict[str, int],
 ) -> tuple[list[TransferGroup], list[Transaction], dict[str, str]]:
     rng = _rng(profile, "transfer_groups")
     target = profile.target("transfer_groups")
     if target < 1:
         return [], [], {}
+
+    circular_label_count = pattern_counts["CIRCULAR_FUND_TRANSFER"]
+    circular_group_count, remainder = divmod(circular_label_count, 3)
+    if remainder:
+        raise ValueError("Circular-transfer labels must form complete 3-leg groups.")
+    if circular_group_count > target:
+        raise ValueError("Transfer-group target is too small for circular labels.")
 
     pending_count = max(1, target // 25)
     failed_count = max(1, target // 50)
@@ -622,7 +648,7 @@ def _build_transfer_groups(
     ] = []
 
     for group_index in range(1, target + 1):
-        circular = group_index == 1
+        circular = group_index <= circular_group_count
         chosen = rng.sample(group_pool, 3) if circular else rng.sample(group_pool, 4)
         start = _at(
             profile.reference_datetime,
@@ -735,21 +761,66 @@ def _build_pattern_transactions(
     devices_by_customer: dict[int, list[Device]],
     tx_numbers: count,
     prefix: str,
+    pattern_counts: dict[str, int],
 ) -> tuple[list[Transaction], dict[str, str]]:
     rng = _rng(profile, "patterns")
     active_merchants = [merchant for merchant in merchants if merchant.is_active]
     if not active_merchants:
         raise ValueError("At least one active merchant is required.")
 
-    reserved_active = list(accounts[active_count - 9 : active_count])
-    if len(reserved_active) != 9:
-        raise ValueError("Pattern account reservation failed.")
-    velocity_account = reserved_active[0]
-    repeated_account = reserved_active[1]
-    high_value_accounts = reserved_active[2:6]
-    new_device_accounts = reserved_active[6:9]
-    if len(dormant_accounts) < 3:
-        raise ValueError("At least three dormant accounts are required.")
+    velocity_group_count, velocity_remainder = divmod(
+        pattern_counts["HIGH_TRANSACTION_VELOCITY"],
+        4,
+    )
+    repeated_group_count, repeated_remainder = divmod(
+        pattern_counts["REPEATED_TRANSACTIONS"],
+        3,
+    )
+    if velocity_remainder or repeated_remainder:
+        raise ValueError("Velocity and repeated labels must form complete patterns.")
+
+    if pattern_counts == PATTERN_COUNTS:
+        reserved_active = list(accounts[active_count - 9 : active_count])
+        if len(reserved_active) != 9:
+            raise ValueError("Pattern account reservation failed.")
+        velocity_accounts = [reserved_active[0]]
+        repeated_accounts = [reserved_active[1]]
+        high_value_accounts = reserved_active[2:6]
+        new_device_accounts = reserved_active[6:9]
+    else:
+        active_candidates = list(accounts[: active_count - 9])
+        new_device_accounts = []
+        seen_customer_ids: set[int] = set()
+        for account in active_candidates:
+            if (
+                account.customer_id not in seen_customer_ids
+                and devices_by_customer.get(account.customer_id)
+            ):
+                new_device_accounts.append(account)
+                seen_customer_ids.add(account.customer_id)
+                if len(new_device_accounts) == pattern_counts["NEW_DEVICE_ACTIVITY"]:
+                    break
+        if len(new_device_accounts) != pattern_counts["NEW_DEVICE_ACTIVITY"]:
+            raise ValueError("Not enough distinct active customers with devices.")
+
+        used_account_ids = {account.id for account in new_device_accounts}
+        remaining_accounts = [
+            account
+            for account in active_candidates
+            if account.id not in used_account_ids
+        ]
+        high_value_end = pattern_counts["HIGH_VALUE_TRANSACTION"]
+        repeated_end = high_value_end + repeated_group_count
+        velocity_end = repeated_end + velocity_group_count
+        if len(remaining_accounts) < velocity_end:
+            raise ValueError("Not enough active accounts for positive-label patterns.")
+        high_value_accounts = remaining_accounts[:high_value_end]
+        repeated_accounts = remaining_accounts[high_value_end:repeated_end]
+        velocity_accounts = remaining_accounts[repeated_end:velocity_end]
+
+    dormant_count = pattern_counts["DORMANT_ACCOUNT_REACTIVATION"]
+    if len(dormant_accounts) < dormant_count:
+        raise ValueError("Not enough dormant accounts for positive-label patterns.")
 
     transactions: list[Transaction] = []
     labels: dict[str, str] = {}
@@ -792,9 +863,8 @@ def _build_pattern_transactions(
         Decimal("120000.00"),
         Decimal("150000.00"),
     )
-    for index, (account, amount) in enumerate(
-        zip(high_value_accounts, high_value_amounts, strict=True)
-    ):
+    for index, account in enumerate(high_value_accounts):
+        amount = high_value_amounts[index % len(high_value_amounts)]
         occurred_at = _at(
             profile.reference_datetime,
             days=20 + index,
@@ -837,7 +907,7 @@ def _build_pattern_transactions(
         )
         labels[transaction.transaction_reference] = "NEW_DEVICE_ACTIVITY"
 
-    for index, account in enumerate(dormant_accounts[:3]):
+    for index, account in enumerate(dormant_accounts[:dormant_count]):
         occurred_at = _at(
             profile.reference_datetime,
             days=30 + index,
@@ -857,56 +927,58 @@ def _build_pattern_transactions(
         labels[transaction.transaction_reference] = "DORMANT_ACCOUNT_REACTIVATION"
 
     repeated_merchant = active_merchants[0]
-    repeated_device = _trusted_device(
-        devices_by_customer,
-        repeated_account.customer_id,
-        rng,
-    )
     repeated_amount = Decimal("1234.56")
-    for index in range(3):
-        occurred_at = _at(
-            profile.reference_datetime,
-            days=15,
-            hours=4,
-            minutes=index * 2,
+    for repeated_account in repeated_accounts:
+        repeated_device = _trusted_device(
+            devices_by_customer,
+            repeated_account.customer_id,
+            rng,
         )
-        transaction = make_transaction(
-            repeated_account,
-            occurred_at,
-            repeated_amount,
-            repeated_merchant,
-            repeated_device,
-            description="Repeated synthetic transaction",
-        )
-        labels[transaction.transaction_reference] = "REPEATED_TRANSACTIONS"
+        for index in range(3):
+            occurred_at = _at(
+                profile.reference_datetime,
+                days=15,
+                hours=4,
+                minutes=index * 2,
+            )
+            transaction = make_transaction(
+                repeated_account,
+                occurred_at,
+                repeated_amount,
+                repeated_merchant,
+                repeated_device,
+                description="Repeated synthetic transaction",
+            )
+            labels[transaction.transaction_reference] = "REPEATED_TRANSACTIONS"
 
-    velocity_device = _trusted_device(
-        devices_by_customer,
-        velocity_account.customer_id,
-        rng,
-    )
     velocity_amounts = (
         Decimal("100.00"),
         Decimal("200.00"),
         Decimal("300.00"),
         Decimal("400.00"),
     )
-    for index, amount in enumerate(velocity_amounts):
-        occurred_at = _at(
-            profile.reference_datetime,
-            days=10,
-            hours=2,
-            minutes=index * 5,
+    for velocity_account in velocity_accounts:
+        velocity_device = _trusted_device(
+            devices_by_customer,
+            velocity_account.customer_id,
+            rng,
         )
-        transaction = make_transaction(
-            velocity_account,
-            occurred_at,
-            amount,
-            active_merchants[(index + 6) % len(active_merchants)],
-            velocity_device,
-            description="Rapid synthetic transaction burst",
-        )
-        labels[transaction.transaction_reference] = "HIGH_TRANSACTION_VELOCITY"
+        for index, amount in enumerate(velocity_amounts):
+            occurred_at = _at(
+                profile.reference_datetime,
+                days=10,
+                hours=2,
+                minutes=index * 5,
+            )
+            transaction = make_transaction(
+                velocity_account,
+                occurred_at,
+                amount,
+                active_merchants[(index + 6) % len(active_merchants)],
+                velocity_device,
+                description="Rapid synthetic transaction burst",
+            )
+            labels[transaction.transaction_reference] = "HIGH_TRANSACTION_VELOCITY"
 
     return transactions, labels
 
@@ -1031,8 +1103,7 @@ def generate_dataset(
 ) -> GenerationResult:
     """Generate one deterministic dataset and its isolated ground truth."""
 
-    if profile.target("alerts") != sum(PATTERN_COUNTS.values()):
-        raise ValueError("This generator version supports only the pilot label target.")
+    pattern_counts = pattern_counts_for_target(profile.target("positive_labels"))
     if profile.target("risk_rules") != len(RISK_RULES):
         raise ValueError("Risk-rule target does not match the rule catalogue.")
 
@@ -1086,6 +1157,7 @@ def generate_dataset(
         devices_by_customer,
         tx_numbers,
         prefix,
+        pattern_counts,
     )
     pattern_transactions, pattern_labels = _build_pattern_transactions(
         profile,
@@ -1096,6 +1168,7 @@ def generate_dataset(
         devices_by_customer,
         tx_numbers,
         prefix,
+        pattern_counts,
     )
     labels.update(pattern_labels)
 
@@ -1157,9 +1230,9 @@ def generate_dataset(
         row.primary_pattern for row in ground_truth if row.primary_pattern
     )
     pattern_count_dict = {
-        pattern: pattern_counter.get(pattern, 0) for pattern in PATTERN_COUNTS
+        pattern: pattern_counter.get(pattern, 0) for pattern in pattern_counts
     }
-    if pattern_count_dict != PATTERN_COUNTS:
+    if pattern_count_dict != pattern_counts:
         raise RuntimeError("Generated fraud-label distribution is incorrect.")
 
     risk_rule_count = int(
@@ -1178,7 +1251,7 @@ def generate_dataset(
         "ground_truth": len(ground_truth),
         "ground_truth_positive": sum(pattern_count_dict.values()),
         "alerts": 0,
-        "alerts_target": profile.target("alerts"),
+        "positive_labels_target": profile.target("positive_labels"),
         "fraud_labels_by_pattern": pattern_count_dict,
     }
     expected_counts = {

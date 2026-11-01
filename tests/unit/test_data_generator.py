@@ -29,7 +29,11 @@ from app.services.data_generator import (
     reset_dataset_run,
     verify_dataset_run,
 )
-from app.services.data_generator.generator import OPENING_BALANCE, PATTERN_COUNTS
+from app.services.data_generator.generator import (
+    OPENING_BALANCE,
+    PATTERN_COUNTS,
+    pattern_counts_for_target,
+)
 from app.services.reproducibility import compute_run_checksums
 
 RUN_REFERENCE = "PILOT-20261022"
@@ -73,6 +77,21 @@ def _assert_empty(session: Session) -> None:
         assert _count(session, model) == 0, model
     assert _count(session, RiskRule) == 12
     assert _count(session, Alert) == 0
+
+
+def test_pattern_counts_scale_without_changing_pilot_distribution():
+    assert pattern_counts_for_target(20) == PATTERN_COUNTS
+    assert pattern_counts_for_target(1000) == {
+        "HIGH_TRANSACTION_VELOCITY": 200,
+        "NEW_DEVICE_ACTIVITY": 150,
+        "CIRCULAR_FUND_TRANSFER": 150,
+        "DORMANT_ACCOUNT_REACTIVATION": 150,
+        "HIGH_VALUE_TRANSACTION": 200,
+        "REPEATED_TRANSACTIONS": 150,
+    }
+
+    with pytest.raises(ValueError, match="positive multiple of 20"):
+        pattern_counts_for_target(21)
 
 
 def test_pilot_generation_matches_profile_and_labels(schema_engine, pilot_profile):

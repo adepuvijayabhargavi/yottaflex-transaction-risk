@@ -9,7 +9,7 @@
     "devices": 3000,
     "transfer_groups": 10000,
     "transactions": 100000,
-    "alerts": 1000,
+    "positive_labels": 1000,
     "risk_rules": 12
   }
 }

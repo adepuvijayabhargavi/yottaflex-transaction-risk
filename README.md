@@ -98,6 +98,13 @@ uses the generator URL for source and ground-truth reads and the read-only
 `YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 20 fraud
 labels and zero alerts. Alerts are created only by the Phase 5 risk engine.
 
+The full profile can be generated with the same command using `--profile full`.
+It creates 100,000 transactions and 100,000 separate ground-truth rows, with
+1,000 positive labels distributed across the six required patterns. The data
+generator creates zero Alert rows for both profiles; actual alerts are created
+separately by the Phase 5 risk engine. Run full-scale generation only against
+an isolated local database, not production.
+
 ## Dashboard and Authentication Settings
 
 The operations dashboard scopes risk and alert metrics to one explicit model
