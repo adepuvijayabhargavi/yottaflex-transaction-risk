@@ -168,3 +168,11 @@ Analysts see their assigned and unassigned cases, while supervisors and admins
 have cross-case oversight; only managers can change priority, escalate, or
 close. Alert links are retained as history when unlinked, and each successful
 case mutation is audited in the same database transaction.
+
+## AI Assistance and Prompt Records
+
+AI assistance and reconstructed, non-verbatim summaries of the available
+project prompts are documented in [docs/ai-usage.md](docs/ai-usage.md) and
+[docs/prompt-history.md](docs/prompt-history.md). These records distinguish
+conversation evidence from Git milestone evidence and do not reproduce
+credentials or private information.
