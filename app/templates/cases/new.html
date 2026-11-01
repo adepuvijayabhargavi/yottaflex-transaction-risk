@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Create Case{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="mb-4">
+        <a href="{{ url_for('cases.index') }}" class="text-decoration-none fs-sm fw-semibold">&larr; Case queue</a>
+        <h1 class="h3 fw-bold text-dark mt-2 mb-1">Create case</h1>
+        <p class="text-secondary mb-0">A new case is assigned to you and must include at least one eligible alert.</p>
+    </div>
+
+    <form method="get" class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+            <label class="form-label" for="eligible-alert-search">Find eligible alerts</label>
+            <div class="input-group">
+                <input id="eligible-alert-search" name="q" value="{{ query }}" class="form-control" maxlength="100" placeholder="Alert reference, transaction reference, or summary">
+                <button class="btn btn-outline-primary" type="submit">Search</button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" class="card border-0 shadow-sm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-body p-4">
+            <div class="row g-3">
+                <div class="col-12 col-lg-8">
+                    <label class="form-label" for="case-title">Title</label>
+                    <input id="case-title" name="title" class="form-control" maxlength="200" required>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="case-priority">Priority</label>
+                    <select id="case-priority" name="priority" class="form-select" required>
+                        {% for value in priorities %}<option value="{{ value }}" {% if value == 'MEDIUM' %}selected{% endif %}>{{ value }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="case-description">Description <span class="text-secondary">(optional)</span></label>
+                    <textarea id="case-description" name="description" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+
+            <hr class="my-4">
+            <h2 class="h5 fw-bold">Eligible alerts</h2>
+            <p class="text-secondary fs-sm">Only open or acknowledged alerts with no active case link are shown. Search narrows the list to at most 100 results.</p>
+            <div class="list-group mb-4">
+                {% for alert in alerts %}
+                    <label class="list-group-item d-flex gap-3 align-items-start">
+                        <input class="form-check-input mt-1" type="checkbox" name="alert_ids" value="{{ alert.id }}" {% if selected_alert_id == alert.id|string %}checked{% endif %}>
+                        <span class="flex-grow-1">
+                            <span class="fw-semibold">{{ alert.reference }}</span>
+                            <span class="badge bg-light text-dark border ms-1">{{ alert.status }}</span>
+                            <span class="badge bg-light text-dark border">{{ alert.priority }}</span>
+                            <span class="d-block text-secondary fs-sm">{{ alert.summary }}</span>
+                            <span class="d-block text-secondary fs-xs">Transaction {{ alert.transaction_reference }} · {{ alert.created_at }}</span>
+                        </span>
+                    </label>
+                {% else %}
+                    <div class="list-group-item text-secondary">No eligible alerts found.</div>
+                {% endfor %}
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" type="submit">Create case</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('cases.index') }}">Cancel</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

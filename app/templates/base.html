@@ -69,10 +69,9 @@
                 </a>
 
                 <div class="sidebar-heading px-3 mt-4 mb-2 text-uppercase fs-xs text-secondary fw-bold">Case Investigation</div>
-                <a href="#" class="nav-item-link disabled" title="Available in Phase 6.4">
+                <a href="{{ url_for('cases.index') }}" class="nav-item-link {% if request.endpoint and request.endpoint.startswith('cases.') %}active{% endif %}">
                     <span class="nav-icon">📁</span>
                     <span class="nav-label">Active Cases</span>
-                    <span class="badge bg-secondary ms-auto fs-xs">Phase 6.4</span>
                 </a>
 
                 {% if current_user.is_authenticated and current_user.role.value in ['SUPERVISOR', 'ADMIN'] %}

@@ -130,4 +130,9 @@ The transaction lookup is available at `/transactions/`, transaction detail at
 `/transactions/accounts/<account_id>`. These views use the application database
 session and stored core records only; they do not access evaluation or
 ground-truth data or rerun risk assessments. Alert-management API endpoints
-remain unimplemented.
+remain unimplemented. Phase 6.4 case management uses the existing case,
+case-alert, note, decision, and audit tables without a schema migration.
+Analysts see their assigned and unassigned cases, while supervisors and admins
+have cross-case oversight; only managers can change priority, escalate, or
+close. Alert links are retained as history when unlinked, and each successful
+case mutation is audited in the same database transaction.

@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}{{ detail.case.reference }} - Case Management{% endblock %}
+
+{% block content %}
+{% set case = detail.case %}
+{% set active_links = detail.links | selectattr('active') | list %}
+<div class="container-fluid px-0">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+        <div>
+            <a href="{{ url_for('cases.index') }}" class="text-decoration-none fs-sm fw-semibold">&larr; Case queue</a>
+            <h1 class="h3 fw-bold text-dark mt-2 mb-1">{{ case.reference }} · {{ case.title }}</h1>
+            <p class="text-secondary mb-0">{{ case.description or 'No case description provided.' }}</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-start">
+            <span class="badge bg-light text-dark border">{{ case.status.replace('_', ' ') }}</span>
+            <span class="badge bg-light text-dark border">{{ case.priority }}</span>
+            {% if case.is_closed %}<span class="badge bg-secondary">Closed · terminal</span>{% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Assigned to</div><div class="fw-semibold">{{ case.assigned_to or 'Unassigned' }}</div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Opened by</div><div class="fw-semibold">{{ case.opened_by }}</div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Opened (UTC)</div><div class="fw-semibold">{{ case.opened_at }}</div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Active alerts</div><div class="fw-semibold">{{ active_links | length }}</div></div></div></div>
+    </div>
+
+    {% if not case.is_closed %}
+        <div class="row g-3 mb-4">
+            {% if can_claim %}
+                <div class="col-12"><form method="post" action="{{ url_for('cases.claim', case_id=case.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit">Claim this case</button></form></div>
+            {% endif %}
+            {% if can_work %}
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white"><h2 class="h6 fw-bold mb-0">Case status</h2></div>
+                        <div class="card-body">
+                            {% if transitions %}
+                                <form method="post" action="{{ url_for('cases.status', case_id=case.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <label class="form-label" for="next-status">Move to</label>
+                                    <select id="next-status" name="status" class="form-select mb-2" required>
+                                        {% for value in transitions %}<option value="{{ value }}">{{ value.replace('_', ' ') }}</option>{% endfor %}
+                                    </select>
+                                    <label class="form-label" for="status-reason">Reason <span class="text-secondary">(required for escalation or closure)</span></label>
+                                    <textarea id="status-reason" name="reason" class="form-control mb-2" rows="2" maxlength="500"></textarea>
+                                    <button class="btn btn-outline-primary btn-sm" type="submit">Update status</button>
+                                </form>
+                            {% else %}<p class="text-secondary mb-0">No status transitions are available.</p>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            {% if is_manager %}
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white"><h2 class="h6 fw-bold mb-0">Management</h2></div>
+                        <div class="card-body">
+                            <form method="post" action="{{ url_for('cases.assignment', case_id=case.id) }}" class="mb-3">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <label class="form-label" for="case-assignee">Assignment</label>
+                                <select id="case-assignee" name="assignee_id" class="form-select mb-2">
+                                    <option value="">Unassigned</option>
+                                    {% for user in review_users %}<option value="{{ user.id }}" {% if user.id == case.assigned_to_user_id %}selected{% endif %}>{{ user.full_name }} · {{ user.role.value }}</option>{% endfor %}
+                                </select>
+                                <button class="btn btn-outline-primary btn-sm" type="submit">Save assignment</button>
+                            </form>
+                            <form method="post" action="{{ url_for('cases.priority', case_id=case.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <label class="form-label" for="case-priority">Priority</label>
+                                <div class="input-group">
+                                    <select id="case-priority" name="priority" class="form-select">
+                                        {% for value in priorities %}<option value="{{ value }}" {% if case.priority == value %}selected{% endif %}>{{ value }}</option>{% endfor %}
+                                    </select>
+                                    <button class="btn btn-outline-primary" type="submit">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-7">
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h2 class="h5 fw-bold mb-0">Linked alerts</h2>
+                    <span class="badge bg-light text-secondary border">{{ active_links | length }} active</span>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for link in detail.links %}
+                        <div class="list-group-item">
+                            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                <div>
+                                    <a class="fw-semibold" href="{{ url_for('alerts.detail', alert_id=link.alert_id) }}">{{ link.alert_reference }}</a>
+                                    <span class="badge bg-light text-dark border ms-1">{{ link.alert_status }}</span>
+                                    {% if not link.active %}<span class="badge bg-secondary ms-1">Unlinked</span>{% endif %}
+                                    <div class="text-secondary fs-sm">{{ link.alert_summary }}</div>
+                                    <a class="fs-sm" href="{{ url_for('transactions.detail', transaction_id=link.transaction_id) }}">Transaction {{ link.transaction_reference }}</a>
+                                    <div class="text-secondary fs-xs">Linked by {{ link.linked_by }} · {{ link.linked_at }}</div>
+                                    {% if not link.active %}<div class="text-secondary fs-xs">Unlinked by {{ link.unlinked_by }} · {{ link.unlinked_at }} · {{ link.unlink_reason }}</div>{% endif %}
+                                </div>
+                                {% if can_work and not case.is_closed and link.active and active_links | length > 1 %}
+                                    <form method="post" action="{{ url_for('cases.unlink_alert', case_id=case.id, link_id=link.id) }}" class="d-flex gap-2 align-items-start">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input name="reason" class="form-control form-control-sm" maxlength="500" placeholder="Unlink reason" aria-label="Unlink reason" required>
+                                        <button class="btn btn-outline-danger btn-sm" type="submit">Unlink</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}<div class="list-group-item text-secondary">No alert links recorded.</div>{% endfor %}
+                </div>
+                {% if can_work and not case.is_closed and eligible_alerts %}
+                    <div class="card-body border-top">
+                        <form method="get" action="{{ url_for('cases.detail', case_id=case.id) }}" class="mb-3">
+                            <label class="form-label" for="eligible-alert-search">Find eligible alerts</label>
+                            <div class="input-group">
+                                <input id="eligible-alert-search" name="alert_q" value="{{ eligible_alert_query }}" class="form-control" maxlength="100" placeholder="Alert or transaction reference">
+                                <button class="btn btn-outline-secondary" type="submit">Search</button>
+                            </div>
+                        </form>
+                        <form method="post" action="{{ url_for('cases.link_alert', case_id=case.id) }}" class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="col">
+                                <label class="form-label" for="link-alert">Link eligible alert</label>
+                                <select id="link-alert" name="alert_id" class="form-select" required>
+                                    {% for alert in eligible_alerts %}<option value="{{ alert.id }}">{{ alert.reference }} · {{ alert.status }} · {{ alert.transaction_reference }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Link alert</button></div>
+                        </form>
+                    </div>
+                {% elif can_work and not case.is_closed %}
+                    <div class="card-body border-top">
+                        <form method="get" action="{{ url_for('cases.detail', case_id=case.id) }}">
+                            <label class="form-label" for="eligible-alert-search">Find eligible alerts</label>
+                            <div class="input-group">
+                                <input id="eligible-alert-search" name="alert_q" value="{{ eligible_alert_query }}" class="form-control" maxlength="100" placeholder="Alert or transaction reference">
+                                <button class="btn btn-outline-secondary" type="submit">Search</button>
+                            </div>
+                        </form>
+                        <p class="text-secondary fs-sm mt-2 mb-0">No eligible alerts match this search.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><h2 class="h5 fw-bold mb-0">Investigation notes</h2></div>
+                <div class="list-group list-group-flush">
+                    {% for note in detail.notes %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between gap-2"><strong>{{ note.type.replace('_', ' ') }}</strong><span class="text-secondary fs-xs">{{ note.author }} · {{ note.noted_at }}</span></div>
+                            <p class="mb-0 mt-2" style="white-space: pre-wrap">{{ note.body }}</p>
+                        </div>
+                    {% else %}<div class="list-group-item text-secondary">No notes recorded.</div>{% endfor %}
+                </div>
+                {% if can_work and not case.is_closed %}
+                    <div class="card-body border-top">
+                        <form method="post" action="{{ url_for('cases.note', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row g-2 mb-2">
+                                <div class="col-12 col-md-4"><label class="form-label" for="note-type">Note type</label><select id="note-type" name="note_type" class="form-select">{% for value in note_types %}<option value="{{ value }}" {% if value == 'INVESTIGATION' %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></div>
+                            </div>
+                            <label class="form-label" for="note-body">Note</label>
+                            <textarea id="note-body" name="body" class="form-control mb-2" rows="3" maxlength="5000" required></textarea>
+                            <button class="btn btn-primary btn-sm" type="submit">Add note</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><h2 class="h5 fw-bold mb-0">Case decisions</h2></div>
+                <div class="list-group list-group-flush">
+                    {% for decision in detail.decisions %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between gap-2"><strong>{{ decision.type.replace('_', ' ') }}</strong><span class="text-secondary fs-xs">{{ decision.decided_by }} · {{ decision.decided_at }}</span></div>
+                            <div class="text-secondary fs-sm">Alert <a href="{{ url_for('alerts.detail', alert_id=decision.alert_id) }}">{{ decision.alert_reference }}</a></div>
+                            <p class="mb-0 mt-2" style="white-space: pre-wrap">{{ decision.rationale }}</p>
+                        </div>
+                    {% else %}<div class="list-group-item text-secondary">No decisions recorded.</div>{% endfor %}
+                </div>
+                {% if can_work and not case.is_closed and active_links %}
+                    <div class="card-body border-top">
+                        <form method="post" action="{{ url_for('cases.decision', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row g-2 mb-2">
+                                <div class="col-12 col-md-6"><label class="form-label" for="decision-alert">Linked alert</label><select id="decision-alert" name="alert_id" class="form-select" required>{% for link in active_links %}<option value="{{ link.alert_id }}">{{ link.alert_reference }}</option>{% endfor %}</select></div>
+                                <div class="col-12 col-md-6"><label class="form-label" for="decision-type">Decision</label><select id="decision-type" name="decision" class="form-select" required>{% for value in decisions %}<option value="{{ value }}">{{ value.replace('_', ' ') }}</option>{% endfor %}</select></div>
+                            </div>
+                            <label class="form-label" for="decision-rationale">Rationale</label>
+                            <textarea id="decision-rationale" name="rationale" class="form-control mb-2" rows="3" maxlength="5000" required></textarea>
+                            <button class="btn btn-primary btn-sm" type="submit">Record decision</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <div class="col-12 col-xl-5">
+            <section class="card border-0 shadow-sm">
+                <div class="card-header bg-white"><h2 class="h5 fw-bold mb-0">Case audit history</h2></div>
+                <ol class="list-group list-group-flush list-unstyled mb-0">
+                    {% for event in detail.audit_events %}
+                        <li class="list-group-item">
+                            <div class="fw-semibold">{{ event.summary }}</div>
+                            <div class="text-secondary fs-xs">{{ event.actor }} · {{ event.occurred_at }} · {{ event.event_type }}</div>
+                            {% if event.details %}<details class="mt-1"><summary class="text-secondary fs-xs">Event details</summary><pre class="small mb-0 mt-1">{{ event.details | tojson(indent=2) }}</pre></details>{% endif %}
+                        </li>
+                    {% else %}<li class="list-group-item text-secondary">No case audit events recorded.</li>{% endfor %}
+                </ol>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

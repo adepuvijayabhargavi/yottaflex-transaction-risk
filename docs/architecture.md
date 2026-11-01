@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Document status | Phase 1-3 complete; Phase 4 migrations, grants, and MySQL pilot execution complete and awaiting final approval |
+| Document status | Phases 1-6.4 implemented; Phase 4 migrations, grants, and MySQL pilot execution complete |
 | Date | 2026-10-31 |
 | Project folder | `C:\Users\ADEPU VIJAYABHARGAVI\OneDrive\Attachments\yottaflex-transaction-risk` |
-| Implementation status | Phase 4 complete through pilot generation and verification; Phase 5 not started |
-| Next gate | Owner approves Phase 4 results before Phase 5 begins |
+| Implementation status | Phase 6.4 case management implemented; awaiting owner review |
+| Next gate | Owner reviews Phase 6.4 before the next phase |
 
 ---
 
@@ -840,3 +840,25 @@ No database or user was created, no password was changed, no table or migration
 revision was created, and no deferred table-level grant was executed during
 Phase 0. The only write operation was the authorized safe-before-migrations
 grant correction for `ytf_app` and `ytf_migrator`.
+
+## Phase 6.4 — Case Management
+
+Phase 6.4 adds an analyst-facing case queue and case workflow on top of the
+existing `cases`, `case_alerts`, `case_notes`, `case_decisions`, and
+`audit_events` tables. No schema migration is required.
+
+- A case is created with at least one OPEN or ACKNOWLEDGED alert. Each alert
+  can have only one active case link; unlinking records actor, timestamp, and
+  reason without deleting the historical link.
+- Case transitions are OPEN → IN_REVIEW, ESCALATED, or CLOSED;
+  IN_REVIEW → OPEN, ESCALATED, or CLOSED; ESCALATED → IN_REVIEW or CLOSED;
+  CLOSED is terminal. Escalation and closure require reasons.
+- Analysts can see cases assigned to them and unassigned cases, claim an
+  unassigned case, and work on their own assigned cases. Supervisors and admins
+  can oversee all cases and manage assignments, priorities, escalations, and
+  closures.
+- Notes and decisions are append-only. Every successful case mutation and its
+  `AuditEvent` are committed in one database transaction.
+- Case routes use the configured application database session only. Risk
+  assessments, findings, alerts, and historical records are not rewritten.
+  Evaluation and ground-truth databases are not queried.

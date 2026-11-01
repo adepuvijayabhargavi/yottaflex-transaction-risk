@@ -23,6 +23,7 @@ from app.services.alerts import (
     get_alert_detail,
     list_alerts,
 )
+from app.services.cases import get_active_case_for_alert
 from app.services.validation import ValidationError
 
 from ..auth.security import role_required
@@ -160,6 +161,7 @@ def detail(alert_id: int):
         "alerts/detail.html",
         alert=alert,
         assignees=_review_users(),
+        active_case=get_active_case_for_alert(db.session, alert_id),
     )
 
 

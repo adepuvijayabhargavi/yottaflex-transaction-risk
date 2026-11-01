@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Case Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-1">Case management</h1>
+            <p class="text-secondary mb-0">Review investigations and their linked alerts.</p>
+        </div>
+        <a class="btn btn-primary align-self-md-start" href="{{ url_for('cases.new') }}">Create case</a>
+    </div>
+
+    <form method="get" class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="case-query">Search</label>
+                    <input id="case-query" name="q" value="{{ result.filters.q }}" class="form-control" maxlength="100" placeholder="Reference, title, or description">
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="case-status">Status</label>
+                    <select id="case-status" name="status" class="form-select">
+                        <option value="">All statuses</option>
+                        {% for value in statuses %}<option value="{{ value }}" {% if result.filters.status == value %}selected{% endif %}>{{ value.replace('_', ' ') }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="case-priority">Priority</label>
+                    <select id="case-priority" name="priority" class="form-select">
+                        <option value="">All priorities</option>
+                        {% for value in priorities %}<option value="{{ value }}" {% if result.filters.priority == value %}selected{% endif %}>{{ value }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-lg-3">
+                    <label class="form-label" for="case-assignee">Assignee</label>
+                    <select id="case-assignee" name="assigned_to" class="form-select">
+                        <option value="">All visible cases</option>
+                        <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+                        {% if not is_manager %}
+                            <option value="{{ current_user.id }}" {% if assigned_filter == current_user.id|string %}selected{% endif %}>Assigned to me</option>
+                        {% endif %}
+                        {% for user in review_users %}
+                            <option value="{{ user.id }}" {% if assigned_filter == user.id|string %}selected{% endif %}>{{ user.full_name }} · {{ user.role.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-lg-1 d-grid"><button class="btn btn-outline-primary" type="submit">Filter</button></div>
+            </div>
+        </div>
+    </form>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white px-4 py-3">
+            <h2 class="h5 fw-bold mb-0">{{ result.pagination.total }} case{{ '' if result.pagination.total == 1 else 's' }}</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>Opened (UTC)</th><th>Case</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Alerts</th></tr></thead>
+                <tbody>
+                    {% for item in result["items"] %}
+                        <tr>
+                            <td>{{ item.opened_at }}</td>
+                            <td><a class="fw-semibold" href="{{ url_for('cases.detail', case_id=item.id) }}">{{ item.reference }}</a><div class="text-secondary fs-sm">{{ item.title }}</div></td>
+                            <td>{{ item.status.replace('_', ' ') }}</td>
+                            <td>{{ item.priority }}</td>
+                            <td>{{ item.assigned_to or 'Unassigned' }}</td>
+                            <td>{{ item.active_alert_count }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-secondary py-4">No cases match these filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="text-secondary fs-sm">Page {{ result.pagination.page }} of {{ result.pagination.pages }}</span>
+            <div class="d-flex gap-2">
+                {% if result.pagination.has_prev %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('cases.index', q=result.filters.q, status=result.filters.status, priority=result.filters.priority, assigned_to=assigned_filter, page=result.pagination.prev_page, per_page=result.pagination.per_page) }}">Previous</a>
+                {% endif %}
+                {% if result.pagination.has_next %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('cases.index', q=result.filters.q, status=result.filters.status, priority=result.filters.priority, assigned_to=assigned_filter, page=result.pagination.next_page, per_page=result.pagination.per_page) }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
