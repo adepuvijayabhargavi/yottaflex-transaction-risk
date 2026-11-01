@@ -43,6 +43,7 @@ htmlcov/
 exports/csv/*
 exports/json/*
 exports/sql/*
+exports/manifests/*
 !exports/csv/.gitkeep
 !exports/json/.gitkeep
 !exports/sql/.gitkeep

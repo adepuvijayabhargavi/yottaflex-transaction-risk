@@ -346,7 +346,10 @@ across schemas, and the risk engine must never read the evaluation path.
 - Canonical checksums keyed by business references.
 - Per-table and overall SHA-256 checksums stored in `dataset_runs` and `exports/manifest.json`.
 - A verification command regenerates a profile and compares checksums.
-- CSV, JSON, and SQL exports are generated from the verified dataset.
+- CSV, JSON, and SQL exports are generated only after verifying the selected
+  run. Manifests include per-file SHA-256 hashes and generated files remain
+  local. Ground truth is exported separately; SQL is generated, never executed.
+- See `docs/exports.md` for the CLI, output layout, and export safety details.
 - Pilot profile is validated before the full profile.
 
 ### 5.7 Deferred optional features

@@ -123,6 +123,40 @@ def verify_command(
         raise click.exceptions.Exit(1)
 
 
+@pilot_cli.command("export")
+@click.option("--profile", "profile_name", default="pilot", show_default=True)
+@click.option("--seed", type=int, default=None)
+@click.option("--run-reference", default=None)
+@click.option(
+    "--format",
+    "export_format",
+    type=click.Choice(("all", "csv", "json", "sql"), case_sensitive=False),
+    default="all",
+    show_default=True,
+)
+def export_command(
+    profile_name: str,
+    seed: int | None,
+    run_reference: str | None,
+    export_format: str,
+) -> None:
+    """Verify and export one completed dataset run locally."""
+
+    from app.services.data_generator.runner import export_pilot_dataset
+    from app.services.export import DatasetExportError
+
+    try:
+        result = export_pilot_dataset(
+            profile_name=profile_name,
+            seed=seed,
+            run_reference=run_reference,
+            formats=export_format.lower(),
+        )
+    except (DatasetExportError, FileNotFoundError, TypeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    _echo(result.to_dict())
+
+
 @click.group("risk")
 def risk_cli() -> None:
     """Evaluate transactions, score risk, and generate alerts."""

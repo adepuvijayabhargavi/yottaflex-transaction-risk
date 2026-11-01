@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -29,6 +30,7 @@ from app.services.data_generator import (
     verify_dataset_run,
 )
 from app.services.data_generator.generator import OPENING_BALANCE, PATTERN_COUNTS
+from app.services.reproducibility import compute_run_checksums
 
 RUN_REFERENCE = "PILOT-20261022"
 
@@ -38,9 +40,14 @@ def pilot_profile():
     return load_profile("pilot")
 
 
-def _generate(schema_engine, profile):
+def _generate(schema_engine, profile, *, run_reference=None):
     with Session(schema_engine, expire_on_commit=False) as session:
-        result = generate_dataset(profile, session, session)
+        result = generate_dataset(
+            profile,
+            session,
+            session,
+            run_reference=run_reference,
+        )
         session.commit()
         return result
 
@@ -133,6 +140,45 @@ def test_pilot_generation_is_reproducible_after_reset(schema_engine, pilot_profi
 
     assert first.checksums["tables"] == second.checksums["tables"]
     assert first.checksums["overall"] == second.checksums["overall"]
+
+
+def test_run_checksums_exclude_other_generated_runs(schema_engine, pilot_profile):
+    first = _generate(schema_engine, pilot_profile)
+    with Session(schema_engine) as session:
+        before = compute_run_checksums(
+            session,
+            session,
+            run_reference=RUN_REFERENCE,
+        )
+
+    with Session(schema_engine) as session:
+        session.add(
+            Customer(
+                customer_reference="ALT-1-CUST-0001",
+                first_name="Other",
+                last_name="Run",
+                email="other.run@example.test",
+                country_code="US",
+                onboarding_date=date(2026, 10, 30),
+            )
+        )
+        session.commit()
+
+    with Session(schema_engine) as session:
+        after = compute_run_checksums(
+            session,
+            session,
+            run_reference=RUN_REFERENCE,
+        )
+
+    assert (
+        before
+        == after
+        == {
+            "tables": first.checksums["tables"],
+            "overall": first.checksums["overall"],
+        }
+    )
 
 
 def test_reset_dry_run_preserves_generated_data(schema_engine, pilot_profile):

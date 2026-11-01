@@ -83,6 +83,16 @@ stored checksums:
 .\.venv\Scripts\flask.exe pilot verify --profile pilot --seed 20261022
 ```
 
+Export a verified run as local CSV, JSON, and SQL files, or select one format
+with `--format csv`, `--format json`, or `--format sql`:
+
+```powershell
+.\.venv\Scripts\flask.exe pilot export --profile pilot --seed 20261022
+```
+
+See [docs/exports.md](docs/exports.md) for the output layout, manifest,
+verification behavior, ground-truth separation, and SQL safety requirements.
+
 The generator and reset commands use `YTF_GENERATOR_DATABASE_URL`. Verification
 uses the generator URL for source and ground-truth reads and the read-only
 `YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 20 fraud

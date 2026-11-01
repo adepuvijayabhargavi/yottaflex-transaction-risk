@@ -101,13 +101,69 @@ def compute_run_checksums(
 ) -> dict[str, Any]:
     """Compute stable per-table and overall checksums for one dataset run."""
 
-    customers = core_session.scalars(select(Customer)).all()
-    accounts = core_session.scalars(select(Account)).all()
-    histories = core_session.scalars(select(AccountStatusHistory)).all()
-    merchants = core_session.scalars(select(Merchant)).all()
-    devices = core_session.scalars(select(Device)).all()
-    transfer_groups = core_session.scalars(select(TransferGroup)).all()
-    transactions = core_session.scalars(select(Transaction)).all()
+    table_rows = collect_run_rows(
+        core_session,
+        eval_session,
+        run_reference=run_reference,
+    )
+    table_checksums = {
+        table_name: checksum_table(table_name, rows, key_fields=key_fields)
+        for table_name, (rows, key_fields) in table_rows.items()
+    }
+    return {
+        "tables": table_checksums,
+        "overall": _overall_checksum(table_checksums),
+    }
+
+
+def collect_run_rows(
+    core_session: Session,
+    eval_session: Session,
+    *,
+    run_reference: str,
+) -> dict[str, tuple[list[dict[str, Any]], tuple[str, ...]]]:
+    """Return canonical business rows for one generated dataset run."""
+
+    prefix = f"{run_reference}-"
+    customers = core_session.scalars(
+        select(Customer).where(
+            Customer.customer_reference.startswith(prefix, autoescape=True)
+        )
+    ).all()
+    accounts = core_session.scalars(
+        select(Account).where(
+            Account.account_number.startswith(prefix, autoescape=True)
+        )
+    ).all()
+    histories = core_session.scalars(
+        select(AccountStatusHistory).where(
+            AccountStatusHistory.account_id.in_(
+                select(Account.id).where(
+                    Account.account_number.startswith(prefix, autoescape=True)
+                )
+            )
+        )
+    ).all()
+    merchants = core_session.scalars(
+        select(Merchant).where(
+            Merchant.merchant_reference.startswith(prefix, autoescape=True)
+        )
+    ).all()
+    devices = core_session.scalars(
+        select(Device).where(
+            Device.device_fingerprint.startswith(prefix, autoescape=True)
+        )
+    ).all()
+    transfer_groups = core_session.scalars(
+        select(TransferGroup).where(
+            TransferGroup.transfer_reference.startswith(prefix, autoescape=True)
+        )
+    ).all()
+    transactions = core_session.scalars(
+        select(Transaction).where(
+            Transaction.transaction_reference.startswith(prefix, autoescape=True)
+        )
+    ).all()
     risk_rules = core_session.scalars(select(RiskRule)).all()
     ground_truth = eval_session.scalars(
         select(GroundTruth).where(
@@ -275,11 +331,9 @@ def compute_run_checksums(
         ),
     }
 
-    table_checksums = {
-        table_name: checksum_table(table_name, rows, key_fields=key_fields)
-        for table_name, (rows, key_fields) in table_rows.items()
-    }
-    return {
-        "tables": table_checksums,
-        "overall": _overall_checksum(table_checksums),
-    }
+    for rows, key_fields in table_rows.values():
+        rows.sort(
+            key=lambda row: canonical_json([row.get(field) for field in key_fields])
+        )
+
+    return table_rows
