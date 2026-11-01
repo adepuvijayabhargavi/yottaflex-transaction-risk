@@ -122,7 +122,13 @@ limit at the reverse proxy or use a shared backing store.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m black --check .
 ```
+
+GitHub Actions runs the same checks on pushes and pull requests for Python 3.11
+and 3.13. The automated suite uses ephemeral SQLite databases and does not
+require MySQL credentials. See [docs/testing.md](docs/testing.md) for details.
 
 ## Phase Status
 
