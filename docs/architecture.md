@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Document status | Phases 1-6.4 implemented; Phase 4 migrations, grants, and MySQL pilot execution complete |
-| Date | 2026-10-31 |
+| Document status | Phases 0-8 and follow-up Tasks 1-2 are committed; this document preserves phase history as well as current architecture |
+| Status reviewed | 2026-11-01 |
 | Project folder | `C:\Users\ADEPU VIJAYABHARGAVI\OneDrive\Attachments\yottaflex-transaction-risk` |
-| Implementation status | Phase 6.4 case management implemented; awaiting owner review |
-| Next gate | Owner reviews Phase 6.4 before the next phase |
+| Implementation status | Phase 8 CI is configured; full-scale generation and AI documentation are committed. A successful remote GitHub Actions run and current live MySQL state are not verified here. |
+| Next gate | No application phase is pending in the committed history. Task 3 documentation consistency is under review. |
 
 ---
 
@@ -142,12 +142,29 @@ never committed; this document contains no credentials or passwords.
 
 ### 4.1 Mandatory dataset targets
 
-| Entity | Required count |
-|---|---:|
-| Customers | 5,000 |
-| Accounts | 7,000 |
-| Transactions | 100,000 |
-| Alerts | 1,000 |
+The profile targets are recorded separately from alerts created by the risk
+engine. `positive_labels` means fraud-positive rows in the evaluation
+ground-truth table; it is not an Alert table target.
+
+| Entity or measure | Pilot | Full |
+|---|---:|---:|
+| Customers | 100 | 5,000 |
+| Accounts | 150 | 7,000 |
+| Merchants | 50 | 500 |
+| Devices | 300 | 3,000 |
+| Transfer groups | 100 | 10,000 |
+| Transactions | 2,000 | 100,000 |
+| Ground-truth rows | 2,000 | 100,000 |
+| Positive ground-truth labels | 20 | 1,000 |
+| Alert rows created by the data generator | 0 | 0 |
+
+The pilot positive-label distribution is `HIGH_TRANSACTION_VELOCITY` 4,
+`NEW_DEVICE_ACTIVITY` 3, `CIRCULAR_FUND_TRANSFER` 3,
+`DORMANT_ACCOUNT_REACTIVATION` 3, `HIGH_VALUE_TRANSACTION` 4, and
+`REPEATED_TRANSACTIONS` 3. The full profile scales these counts to 200, 150,
+150, 150, 200, and 150, respectively. These are ground-truth labels, not
+generated Alert records; actual alert creation belongs to the Phase 5 risk
+engine.
 
 The fixed random seed is **20261022**.
 
@@ -347,8 +364,9 @@ across schemas, and the risk engine must never read the evaluation path.
 - Per-table and overall SHA-256 checksums stored in `dataset_runs` and `exports/manifest.json`.
 - A verification command regenerates a profile and compares checksums.
 - CSV, JSON, and SQL exports are generated only after verifying the selected
-  run. Manifests include per-file SHA-256 hashes and generated files remain
-  local. Ground truth is exported separately; SQL is generated, never executed.
+  run. Manifests include per-artifact SHA-256 hashes and generated files remain
+  local; the manifest does not contain a self-hash. Ground truth is exported
+  separately; SQL is generated, never executed.
 - See `docs/exports.md` for the CLI, output layout, and export safety details.
 - Pilot profile is validated before the full profile.
 
@@ -363,7 +381,10 @@ The following are not part of the required workflow and are deferred to the fina
 - Background job queue.
 - External CSV import.
 - OpenAPI/Swagger UI.
-- CI pipeline.
+
+GitHub Actions CI was added in Phase 8. The repository configures push and pull
+request checks for Python 3.11 and 3.13; this status does not establish that a
+remote workflow run has succeeded.
 
 ---
 
@@ -508,8 +529,9 @@ Ground-truth isolation is enforced at four levels:
 
 ### 7.5 MySQL version compatibility
 
-The installed server is MySQL 9.1.0 Community Server. It is the selected server
-for the MVP, and no MySQL 8 installation is required.
+The Phase 0 environment inspection recorded MySQL 9.1.0 Community Server as
+the selected server for the MVP; no MySQL 8 installation was required. This is
+a historical environment record, not a fresh check of the current server.
 
 The planned schema uses supported MySQL features:
 
@@ -524,13 +546,18 @@ The planned schema uses supported MySQL features:
 - Generated columns
 - Composite indexes
 
-The project uses SQLAlchemy 2.1.6, PyMySQL 1.2.3, and cryptography 50.0.2.
-SQLAlchemy's MySQL dialect loads with the PyMySQL driver, and cryptography
-enables PyMySQL's `caching_sha2_password` RSA authentication path over non-TLS
-connections. Live Python authentication succeeded for every role that has
-schema privileges.
+The environment record lists SQLAlchemy 2.1.6, PyMySQL 1.2.3, and
+cryptography 50.0.2. SQLAlchemy's MySQL dialect loads with the PyMySQL driver,
+and cryptography enables PyMySQL's `caching_sha2_password` RSA authentication
+path over non-TLS connections. Python authentication was reported successful
+for every role that had schema privileges during the recorded verification;
+that connection test has not been repeated here.
 
 ### 7.6 Grant verification and execution status
+
+The following is a historical report of live MySQL verification and grant
+execution on 2026-10-30 and 2026-10-31. It is not a fresh verification of the
+current server, principals, or grants.
 
 Access was verified live against MySQL 9.1.0. On 2026-10-30, the owner
 authorized the safe-before-migrations blocks for `ytf_app` and `ytf_migrator`.
@@ -582,9 +609,10 @@ receives evaluation credentials and has no privileges on `yottaflex_eval`.
 The environment variable for the second connection is
 `YTF_EVAL_CORE_DATABASE_URL`. `DatabaseRole.EVAL_CORE` and its URL helper live
 in `app/database.py`, with tests proving the evaluation URLs stay separate. The
-account exists and the pilot verification uses it as a separate read-only
-session for result counts. The evaluation job itself remains a later-phase
-deliverable.
+project records report that the account was created and pilot verification
+used it as a separate read-only session for result counts. Evaluation metrics
+are implemented in `app/evaluation/metrics.py` and exposed through the
+`risk evaluate-metrics` CLI; tests cover the separate result connections.
 
 ### 7.8 Rerun and duplicate prevention
 
@@ -597,21 +625,25 @@ version. The database constraints are:
 
 Consequences:
 
-- Repeating the same model version for the same transaction cannot insert a
-  duplicate assessment. The second insert fails with a duplicate-key error.
+- Repeating the same model version for the same transaction finds the existing
+  assessment and skips it without creating another assessment, findings, or
+  alert.
 - A finding cannot be repeated inside the same assessment for the same rule.
 - One finding cannot produce more than one alert.
-- The risk engine must use a stable model version for a rerun, check for an
-  existing assessment before scoring, and treat a duplicate-key error as
-  "already exists" rather than retrying blindly.
+- Before scoring, the risk engine checks for an existing assessment with the
+  same transaction and model version. The database uniqueness constraint also
+  protects against duplicate inserts.
+- The batch runner rolls back an `IntegrityError` collision and counts the
+  transaction as skipped. This is a defensive collision path, not the normal
+  result of rerunning an already assessed transaction.
 - Because `ytf_risk` has no `UPDATE` or `DELETE`, an existing result must be
   reused or skipped, not modified in place.
 - A deliberate `model_version` change creates a new assessment by design. It is
   a new result, not a duplicate under the approved uniqueness rule.
 
-The risk-engine rerun logic and its tests are not implemented yet. They are
-later implementation work. The schema constraints are mandatory and are now part
-of the metadata and test expectations.
+`tests/unit/test_risk_idempotency.py` covers same-version skips and the
+creation of a new result for a different model version. Existing assessments
+are not updated in place.
 
 ---
 
@@ -634,6 +666,10 @@ of the metadata and test expectations.
 
 ## 9. Open Decisions and Remaining Work
 
+The table below is a project decision and phase-gate ledger. Its completed
+entries are historical evidence from their respective milestones, not a fresh
+verification of the current live MySQL server or credentials.
+
 | # | Decision | Why it matters | Status |
 |---:|---|---|---|
 | 1 | Use MySQL 9.1 or install MySQL 8 | MySQL version compatibility | **Resolved:** use MySQL 9.1.0 |
@@ -646,10 +682,10 @@ of the metadata and test expectations.
 | 8 | Make the assessment rerun constraint mandatory | Prevents duplicate assessments for the same transaction and model version | **Resolved:** unique constraint added to model metadata and tests; it must appear in the first core migration |
 | 9 | Add `ytf_eval_core` role URL support | Enables ground truth and core results to be read without cross-schema credentials | **Resolved:** `DatabaseRole.EVAL_CORE`, URL helper, template placeholder, and tests added |
 | 10 | Create `ytf_eval_core`, configure its real URL, and implement the second evaluation connection | Enables ground truth and core results to be read without cross-schema credentials | **Resolved:** account and URL configured; pilot verification uses a separate read-only result session |
-| 11 | Implement and test risk-engine rerun/idempotency logic | Schema constraints prevent duplicates, but the engine must check existing rows and handle duplicate-key errors | **Pending** later implementation |
+| 11 | Implement and test risk-engine rerun/idempotency logic | Avoid duplicate assessments for the same transaction and model version | **Resolved:** existing assessments are skipped; integrity collisions are rolled back and counted as skipped. Covered by `tests/unit/test_risk_idempotency.py`. |
 | 12 | Approve Phase 1 | Formal gate before implementation | **Resolved:** owner approved Phase 1 foundation work on 2026-10-30 |
 | 13 | Complete Phase 2 models and schema definitions | Required before any migration can be generated | **Resolved:** 20 models, constraints, indexes, relationships, append-only protection, schema tests, and mapping documentation completed |
-| 14 | Approve Phase 2 | Formal gate before migration work | **Resolved:** owner approved Phase 2 on 2026-10-30; migrations await a separate approval |
+| 14 | Approve Phase 2 | Formal gate before migration work | **Resolved:** owner approved Phase 2 on 2026-10-30; the core and evaluation migration revisions were subsequently added and applied as recorded in the Phase 4 project history. |
 
 No passwords should be sent in chat. Real credentials exist only in the local,
 version-control-excluded `.env` file. This document and `.env.example` contain
@@ -657,7 +693,10 @@ no real credentials.
 
 ---
 
-## 10. Phase 0 Checklist
+## 10. Historical Phase 0 Checklist
+
+This checklist records the state and checks reported during Phase 0. Unchecked
+items below were open at that phase boundary; they are not a current task list.
 
 - [x] Inspect the project folder.
 - [x] Confirm no existing files were deleted.
@@ -701,23 +740,29 @@ no real credentials.
 
 ---
 
-## 11. Phase 1, Phase 2, and Phase 3 Gate
+## 11. Historical Phase 1, Phase 2, and Phase 3 Gate
 
-**Current status:** Phase 0, Phase 1 foundation, Phase 2 model/schema
-definitions, and Phase 3 validation services are complete. The approved
-safe-before-migrations grants for `ytf_app` and `ytf_migrator` were executed and
-verified.
+This is the gate summary from the earlier phase record. Its statements that
+migrations, tables, grants, or later implementation were still pending are
+historical and were superseded by subsequent committed phase work.
+
+**Status at that historical gate:** Phase 0, Phase 1 foundation, Phase 2
+model/schema definitions, and Phase 3 validation services were complete. The
+approved safe-before-migrations grants for `ytf_app` and `ytf_migrator` had
+been executed and verified.
 
 Phase 2 added the core and evaluation SQLAlchemy models, constraints, indexes,
 relationships, append-only ORM protection, schema tests, and the model-to-table
 mapping. Phase 3 added cross-table validation services, validation-event
-recording, and tests for the five required edge cases. No migration was
-executed, no MySQL table was created, no data was seeded, no database password
-was changed, and no deferred table-level grant was executed.
+recording, and tests for the five required edge cases. At that gate, no
+migration had been executed, no MySQL table had been created, no data had been
+seeded, no database password had been changed, and no deferred table-level
+grant had been executed.
 
-Migrations, table creation, deferred grants, account creation for
-`ytf_eval_core`, synthetic data, and risk-engine behavior remain blocked until
-the project owner gives the next approval.
+At that gate, migrations, table creation, deferred grants, account creation
+for `ytf_eval_core`, synthetic data, and risk-engine behavior remained blocked
+until the project owner gave the next approval. Subsequent phase records
+documented that work as completed.
 
 ---
 
@@ -822,6 +867,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES
 ON `yottaflex_eval`.*
 TO 'ytf_migrator'@'localhost';
 ```
+
+The following table is the recorded Phase 0 verification snapshot. Later
+phases subsequently created and applied migrations, added table-level grants,
+and created `ytf_eval_core`; these entries are not current outstanding tasks.
 
 Verified results:
 

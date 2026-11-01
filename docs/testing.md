@@ -17,12 +17,16 @@ require live MySQL, database credentials, or a local `.env` file.
 
 ## GitHub Actions
 
-The workflow in `.github/workflows/ci.yml` runs for pushes and pull requests.
-It tests Python 3.11 and 3.13 in separate Ubuntu jobs, installs
-`requirements-dev.txt`, and runs pytest, Ruff, and Black. Any failed command
-fails its job. The workflow requests read-only repository contents permission
-and does not use secrets or modify application, production database, or grant
-configuration.
+The workflow is configured to run on pushes and pull requests. A configured
+workflow is not evidence that a remote run completed successfully; confirm
+that in the repository's Actions run history before reporting CI success.
+
+The workflow definition in `.github/workflows/ci.yml` configures push and pull
+request triggers. It tests Python 3.11 and 3.13 in separate Ubuntu jobs,
+installs `requirements-dev.txt`, and runs pytest, Ruff, and Black. Any failed
+command fails its job. The workflow requests read-only repository contents
+permission and does not use secrets or modify application, production
+database, or grant configuration.
 
 CI validates the SQLite-based automated suite; it does not replace separate
 MySQL integration checks, migration verification, or live database-grant

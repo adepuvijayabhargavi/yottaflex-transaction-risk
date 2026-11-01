@@ -27,14 +27,16 @@ exports/
 CSV files use fixed table-specific columns. The core JSON and SQL files do not
 contain ground truth; labels are placed in separate, clearly named files. The
 manifest records the run profile, seed, fixed reference time, generator
-version, record counts, dataset checksums, selected formats, and each output
-file's SHA-256 digest and byte size. CSV entries also include row counts.
+version, record counts, dataset checksums, selected formats, and each generated
+export artifact's SHA-256 digest and byte size. CSV artifact entries also
+include row counts. The manifest itself is not included in its own file list
+and therefore has no self-hash.
 
 The run checksums are canonical SHA-256 hashes keyed by business references.
 Generated core records are scoped to the run-reference prefix, ground truth
 is scoped to the exact run reference, and the shared risk-rule catalogue is
-included in full. Repeating an export for the same verified run produces
-identical files and manifest contents.
+included in full. Repeating an export for the same verified run with the same
+selected formats produces identical export files and manifest contents.
 
 ## Safety
 

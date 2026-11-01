@@ -95,8 +95,9 @@ verification behavior, ground-truth separation, and SQL safety requirements.
 
 The generator and reset commands use `YTF_GENERATOR_DATABASE_URL`. Verification
 uses the generator URL for source and ground-truth reads and the read-only
-`YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 20 fraud
-labels and zero alerts. Alerts are created only by the Phase 5 risk engine.
+`YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 2,000
+ground-truth rows, of which 20 are positive fraud labels, and zero Alert rows.
+Alerts are created only by the Phase 5 risk engine.
 
 The full profile can be generated with the same command using `--profile full`.
 It creates 100,000 transactions and 100,000 separate ground-truth rows, with
@@ -104,6 +105,19 @@ It creates 100,000 transactions and 100,000 separate ground-truth rows, with
 generator creates zero Alert rows for both profiles; actual alerts are created
 separately by the Phase 5 risk engine. Run full-scale generation only against
 an isolated local database, not production.
+
+| Positive ground-truth pattern | Pilot | Full |
+|---|---:|---:|
+| `HIGH_TRANSACTION_VELOCITY` | 4 | 200 |
+| `NEW_DEVICE_ACTIVITY` | 3 | 150 |
+| `CIRCULAR_FUND_TRANSFER` | 3 | 150 |
+| `DORMANT_ACCOUNT_REACTIVATION` | 3 | 150 |
+| `HIGH_VALUE_TRANSACTION` | 4 | 200 |
+| `REPEATED_TRANSACTIONS` | 3 | 150 |
+
+These are counts of positive evaluation labels, not Alert database records.
+For the other profile targets, see `dataset_profiles/pilot.json` and
+`dataset_profiles/full.json`.
 
 ## Dashboard and Authentication Settings
 
@@ -133,23 +147,30 @@ limit at the reverse proxy or use a shared backing store.
 .\.venv\Scripts\python.exe -m black --check .
 ```
 
-GitHub Actions runs the same checks on pushes and pull requests for Python 3.11
-and 3.13. The automated suite uses ephemeral SQLite databases and does not
-require MySQL credentials. See [docs/testing.md](docs/testing.md) for details.
+GitHub Actions is configured to run the same checks on pushes and pull
+requests for Python 3.11 and 3.13. This documents workflow configuration, not
+a verified successful remote run. The automated suite uses ephemeral SQLite
+databases and does not require MySQL credentials. See
+[docs/testing.md](docs/testing.md) for details.
 
 ## Phase Status
 
-Phase 1 foundation, Phase 2 model/schema definitions, Phase 3 validation
-services, and the Phase 4 migration/generator implementation are complete. The
-core and evaluation migrations are applied (`yottaflex` has 20 tables including
+Phases 0–8 are represented by the completed milestone commits in Git history.
+The full-scale data-generation and AI usage/prompt-history documentation tasks
+are also committed. The initial Phase 1–4 implementation included the core
+and evaluation migrations; project records report their application
+(`yottaflex` has 20 tables including
 `alembic_version`; `yottaflex_eval` has `ground_truth` and `alembic_version`).
-The deterministic generator, safe reset, canonical checksums, and verification
-services are implemented and covered by the test suite.
+Those migration and MySQL pilot results are historical records; the live
+database was not freshly verified for this README update. The deterministic
+generator, safe reset, canonical checksums, and verification services are
+implemented and covered by tests, including the full-profile SQLite test.
 
-Phase 4 MySQL pilot execution is complete. The
-approved table grants were applied, `ytf_eval_core` was created, and isolation
-was verified. The pilot generated the approved counts, produced zero alerts,
-and reproduced identical checksums after a confirmed reset and regeneration.
+Phase 4 MySQL pilot execution is recorded as complete: the approved table
+grants were applied, `ytf_eval_core` was created, and isolation was verified at
+that time. This is not a fresh check of the live server. The pilot generated
+the approved counts, produced zero Alert rows, and reproduced identical
+checksums after a confirmed reset and regeneration.
 The Phase 5 risk engine and Phase 6.2 alert review workflow are implemented.
 Alert workflows provide assignment, acknowledgement, close, and dismiss actions
 with append-only audit events. Phase 6.3 transaction investigation provides a

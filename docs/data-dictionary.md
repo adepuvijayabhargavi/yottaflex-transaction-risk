@@ -1,7 +1,11 @@
 # Data Dictionary and Model-to-Table Mapping
 
-Phase 2 defines the SQLAlchemy models and schema metadata only. No migration has
-been executed and no MySQL table has been created.
+Phase 2 initially defined the SQLAlchemy models and schema metadata. The
+subsequent Phase 4 project record and committed migration revisions document
+creation and application of the core and evaluation migrations, followed by
+the MySQL pilot. This is historical project evidence; the live MySQL server and
+its current schema state have not been freshly checked as part of this
+documentation update.
 
 ## Conventions
 
