@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% from "alerts/_macros.html" import priority_badge, status_badge, risk_badge, score_badge, utc_datetime %}
+
+{% block title %}Alert Management - YottaFlex{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-1">Alert Management</h1>
+            <p class="text-secondary mb-0">Review alerts raised by the risk engine and inspect the supporting assessment context.</p>
+        </div>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 fs-sm">
+            {{ pagination.total }} matching alert{{ '' if pagination.total == 1 else 's' }}
+        </span>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <form method="get" action="{{ url_for('alerts.index') }}" class="row g-3 align-items-end">
+                <div class="col-12 col-lg-4">
+                    <label for="q" class="form-label alert-filter-label">Search</label>
+                    <input
+                        type="search"
+                        id="q"
+                        name="q"
+                        value="{{ filters.q }}"
+                        class="form-control"
+                        placeholder="Alert ID, alert reference, transaction ID or reference"
+                    >
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label for="priority" class="form-label alert-filter-label">Priority</label>
+                    <select id="priority" name="priority" class="form-select">
+                        <option value="">All priorities</option>
+                        {% for priority in priorities %}
+                            <option value="{{ priority }}" {% if filters.priority and filters.priority.value == priority %}selected{% endif %}>{{ priority }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label for="status" class="form-label alert-filter-label">Status</label>
+                    <select id="status" name="status" class="form-select">
+                        <option value="">All statuses</option>
+                        {% for status in statuses %}
+                            <option value="{{ status }}" {% if filters.status and filters.status.value == status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label for="risk_level" class="form-label alert-filter-label">Risk level</label>
+                    <select id="risk_level" name="risk_level" class="form-select">
+                        <option value="">All risk levels</option>
+                        {% for risk_level in risk_levels %}
+                            <option value="{{ risk_level }}" {% if filters.risk_level and filters.risk_level.value == risk_level %}selected{% endif %}>{{ risk_level }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label for="date_from" class="form-label alert-filter-label">Alert date from</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ filters.date_from.isoformat() if filters.date_from else '' }}" class="form-control">
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label for="date_to" class="form-label alert-filter-label">Alert date to</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ filters.date_to.isoformat() if filters.date_to else '' }}" class="form-control">
+                </div>
+                <div class="col-12 col-lg-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold">Apply filters</button>
+                    <a href="{{ url_for('alerts.index') }}" class="btn btn-outline-secondary px-4 fw-semibold">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 px-4 py-3">
+            <div>
+                <h2 class="h5 fw-bold text-dark mb-1">Alert Queue</h2>
+                <p class="text-secondary fs-sm mb-0">
+                    Showing {{ pagination.start_index }}-{{ pagination.end_index }} of {{ pagination.total }} alerts
+                </p>
+            </div>
+            <span class="badge bg-light text-secondary border px-3 py-2">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr class="fs-xs text-uppercase text-secondary">
+                        <th class="ps-4">Alert</th>
+                        <th>Transaction</th>
+                        <th>Customer</th>
+                        <th>Risk</th>
+                        <th>Score</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th class="pe-4 text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="fs-sm">
+                    {% for item in items %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{{ url_for('alerts.detail', alert_id=item.alert.id) }}" class="fw-mono fw-bold text-primary text-decoration-none">{{ item.alert.reference }}</a>
+                                <div class="text-secondary fs-xs alert-summary-text">{{ item.alert.summary }}</div>
+                            </td>
+                            <td>
+                                <div class="fw-mono text-dark">{{ item.transaction.reference }}</div>
+                                <div class="text-secondary fs-xs">{{ item.transaction.type }} · {{ item.transaction.currency }} {{ item.transaction.formatted_amount }}</div>
+                            </td>
+                            <td>
+                                {% if item.customer %}
+                                    <div class="fw-semibold text-dark">{{ item.customer.name }}</div>
+                                    <div class="text-secondary fs-xs">{{ item.customer.reference }}</div>
+                                {% else %}
+                                    <span class="text-secondary">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ risk_badge(item.assessment.risk_level) }}</td>
+                            <td>{{ score_badge(item.alert.score) }}</td>
+                            <td>{{ priority_badge(item.alert.priority) }}</td>
+                            <td>{{ status_badge(item.alert.status) }}</td>
+                            <td class="text-secondary fs-xs">{{ utc_datetime(item.alert.created_at) }}</td>
+                            <td class="pe-4 text-end">
+                                <a href="{{ url_for('alerts.detail', alert_id=item.alert.id) }}" class="btn btn-sm btn-outline-primary fw-semibold">View</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-secondary py-5">
+                                No alerts match the selected search and filters.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card-footer bg-white border-top px-4 py-3">
+            <nav aria-label="Alert pagination">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    <li class="page-item {% if not pagination.prev_url %}disabled{% endif %}">
+                        <a class="page-link" href="{{ pagination.prev_url or '#' }}">Previous</a>
+                    </li>
+                    {% for link in pagination.links %}
+                        <li class="page-item {% if link.current %}active{% endif %}">
+                            <a class="page-link" href="{{ link.url }}">{{ link.number }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="page-item {% if not pagination.next_url %}disabled{% endif %}">
+                        <a class="page-link" href="{{ pagination.next_url or '#' }}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -81,6 +81,26 @@ uses the generator URL for source and ground-truth reads and the read-only
 `YTF_EVAL_CORE_DATABASE_URL` for result counts. The pilot run creates 20 fraud
 labels and zero alerts. Alerts are created only by the Phase 5 risk engine.
 
+## Dashboard and Authentication Settings
+
+The operations dashboard scopes risk and alert metrics to one explicit model
+version so mixed evaluation runs do not distort KPIs. Configure it with:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `YTF_DASHBOARD_MODEL_VERSION` | `v1.0.1` | Model version shown on the dashboard |
+| `YTF_ALERT_THRESHOLD` | `40` | Evaluation threshold displayed in the dashboard |
+| `YTF_DATA_REFERENCE_UTC` | `2026-10-30T00:00:00+00:00` | Reference date shown in the UI |
+| `YTF_LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed inside the window |
+| `YTF_LOGIN_WINDOW_SECONDS` | `300` | Rolling failure window in seconds |
+| `YTF_LOGIN_LOCKOUT_SECONDS` | `900` | Client lockout duration in seconds |
+
+Sign-out is a CSRF-protected `POST`. Successful sign-ins, failed sign-ins, and
+sign-outs append `AUTH_LOGIN_SUCCESS`, `AUTH_LOGIN_FAILED`, and `AUTH_LOGOUT`
+audit events without storing passwords or hashes. Login throttling is held in
+process memory; multi-worker deployments should enforce an additional shared
+limit at the reverse proxy or use a shared backing store.
+
 ## Run Tests
 
 ```powershell
@@ -96,9 +116,11 @@ core and evaluation migrations are applied (`yottaflex` has 20 tables including
 The deterministic generator, safe reset, canonical checksums, and verification
 services are implemented and covered by the test suite.
 
-Phase 4 MySQL pilot execution is complete and awaiting final approval. The
+Phase 4 MySQL pilot execution is complete. The
 approved table grants were applied, `ytf_eval_core` was created, and isolation
 was verified. The pilot generated the approved counts, produced zero alerts,
 and reproduced identical checksums after a confirmed reset and regeneration.
-Risk scoring, alert workflows, and APIs remain intentionally unimplemented
-until Phase 4 is approved.
+The Phase 5 risk engine and Phase 6.2 alert review workflow are implemented.
+Alert workflows provide assignment, acknowledgement, close, and dismiss actions
+with append-only audit events. Alert-management API endpoints remain
+unimplemented.

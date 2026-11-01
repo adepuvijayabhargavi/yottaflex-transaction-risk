@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% from "alerts/_macros.html" import priority_badge, status_badge, risk_badge, score_badge, utc_datetime, json_block %}
+
+{% block title %}{{ alert.alert.reference }} - Alert Detail{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-4">
+        <div>
+            <a href="{{ url_for('alerts.index') }}" class="text-decoration-none fs-sm fw-semibold">&larr; Back to alerts</a>
+            <h1 class="h3 fw-bold text-dark mt-2 mb-1">{{ alert.alert.reference }}</h1>
+            <p class="text-secondary mb-0">{{ alert.alert.summary }}</p>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            {{ status_badge(alert.alert.status) }}
+            {{ priority_badge(alert.alert.priority) }}
+            {{ risk_badge(alert.assessment.risk_level) }}
+            {% if alert.alert.status in ['OPEN', 'ACKNOWLEDGED'] %}
+                <span class="badge bg-success-subtle text-success border px-3 py-2">Review actions enabled</span>
+            {% else %}
+                <span class="badge bg-light text-secondary border px-3 py-2">Terminal alert</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if alert.alert.status in ['OPEN', 'ACKNOWLEDGED'] %}
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-xl-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom px-4 py-3">
+                        <h2 class="h6 fw-bold text-dark mb-0">Assignment</h2>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post" action="{{ url_for('alerts.assign', alert_id=alert.alert.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label for="assignee_id" class="form-label">Assign to</label>
+                            <select id="assignee_id" name="assignee_id" class="form-select mb-3">
+                                <option value="" {% if not alert.alert.assigned_to_user_id %}selected{% endif %}>Unassigned</option>
+                                {% for user in assignees %}
+                                    <option value="{{ user.id }}" {% if user.id == alert.alert.assigned_to_user_id %}selected{% endif %}>
+                                        {{ user.full_name }} · {{ user.role.value }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-outline-primary btn-sm fw-semibold">Save assignment</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-bottom px-4 py-3">
+                        <h2 class="h6 fw-bold text-dark mb-0">Review Actions</h2>
+                    </div>
+                    <div class="card-body p-4">
+                        {% if alert.alert.status == 'OPEN' %}
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <form method="post" action="{{ url_for('alerts.acknowledge', alert_id=alert.alert.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-warning btn-sm fw-semibold">Acknowledge</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <form method="post" action="{{ url_for('alerts.close', alert_id=alert.alert.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <label for="close_reason" class="form-label">Close reason</label>
+                                    <textarea id="close_reason" name="reason" class="form-control mb-2" rows="2" maxlength="500" required></textarea>
+                                    <button type="submit" class="btn btn-success btn-sm fw-semibold">Close alert</button>
+                                </form>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <form method="post" action="{{ url_for('alerts.dismiss', alert_id=alert.alert.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <label for="dismiss_reason" class="form-label">Dismiss reason</label>
+                                    <textarea id="dismiss_reason" name="reason" class="form-control mb-2" rows="2" maxlength="500" required></textarea>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm fw-semibold">Dismiss alert</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="alert-filter-label mb-2">Alert score</div>
+                    <div class="d-flex align-items-center gap-2">
+                        {{ score_badge(alert.alert.score) }}
+                        <span class="text-secondary fs-sm">out of 100</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="alert-filter-label mb-2">Assessment score</div>
+                    <div class="d-flex align-items-center gap-2">
+                        {{ score_badge(alert.assessment.score) }}
+                        <span class="text-secondary fs-sm">out of 100</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="alert-filter-label mb-2">Assessment status</div>
+                    <div class="fw-semibold text-dark">{{ alert.assessment.status }}</div>
+                    <div class="text-secondary fs-xs">{{ alert.assessment.model_version }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="alert-filter-label mb-2">Created</div>
+                    <div class="fw-semibold text-dark fs-sm">{{ utc_datetime(alert.alert.created_at) }}</div>
+                    <div class="text-secondary fs-xs">{{ alert.transaction.type }} transaction</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-8">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Alert Context</h2>
+                </div>
+                <div class="card-body p-4">
+                    <dl class="row mb-0 fs-sm">
+                        <dt class="col-sm-4 text-secondary">Alert reference</dt>
+                        <dd class="col-sm-8 fw-mono fw-semibold text-dark">{{ alert.alert.reference }}</dd>
+                        <dt class="col-sm-4 text-secondary">Status</dt>
+                        <dd class="col-sm-8">{{ status_badge(alert.alert.status) }}</dd>
+                        <dt class="col-sm-4 text-secondary">Priority</dt>
+                        <dd class="col-sm-8">{{ priority_badge(alert.alert.priority) }}</dd>
+                        <dt class="col-sm-4 text-secondary">Assigned to</dt>
+                        <dd class="col-sm-8">{{ alert.alert.assigned_to or 'Unassigned' }}</dd>
+                        <dt class="col-sm-4 text-secondary">Acknowledged</dt>
+                        <dd class="col-sm-8">{{ utc_datetime(alert.alert.acknowledged_at) }}</dd>
+                        <dt class="col-sm-4 text-secondary">Resolved</dt>
+                        <dd class="col-sm-8">{{ utc_datetime(alert.alert.closed_at) }}</dd>
+                        <dt class="col-sm-4 text-secondary">Triggering rule</dt>
+                        <dd class="col-sm-8">
+                            <span class="fw-mono fw-semibold">{{ alert.triggering_rule.code }}</span>
+                            <span class="text-secondary"> · {{ alert.triggering_rule.name }}</span>
+                        </dd>
+                    </dl>
+
+                    {% if alert.alert.details %}
+                        <hr class="my-4">
+                        <h3 class="h6 fw-bold text-dark mb-2">Alert details</h3>
+                        {{ json_block(alert.alert.details) }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Transaction</h2>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3 fs-sm">
+                        <div class="col-12 col-md-6">
+                            <div class="alert-filter-label">Reference</div>
+                            <div class="fw-mono fw-semibold text-dark">{{ alert.transaction.reference }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Type</div>
+                            <div class="fw-semibold text-dark">{{ alert.transaction.type }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Status</div>
+                            <div class="fw-semibold text-dark">{{ alert.transaction.status }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Amount</div>
+                            <div class="fw-semibold text-dark">{{ alert.transaction.currency }} {{ alert.transaction.formatted_amount }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Occurred</div>
+                            <div class="text-dark">{{ utc_datetime(alert.transaction.occurred_at) }}</div>
+                        </div>
+                        {% if alert.transaction.description %}
+                            <div class="col-12">
+                                <div class="alert-filter-label">Description</div>
+                                <div class="text-dark">{{ alert.transaction.description }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Risk Assessment</h2>
+                    <span class="badge bg-light text-secondary border">Read-only</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3 fs-sm">
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Assessment ID</div>
+                            <div class="fw-mono fw-semibold text-dark">#{{ alert.assessment.id }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Model version</div>
+                            <div class="fw-semibold text-dark">{{ alert.assessment.model_version }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Risk level</div>
+                            <div>{{ risk_badge(alert.assessment.risk_level) }}</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="alert-filter-label">Assessed</div>
+                            <div class="text-dark">{{ utc_datetime(alert.assessment.assessed_at) }}</div>
+                        </div>
+                    </div>
+
+                    {% if alert.assessment.explanation %}
+                        <hr class="my-4">
+                        <h3 class="h6 fw-bold text-dark mb-2">Assessment explanation</h3>
+                        {{ json_block(alert.assessment.explanation) }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Triggered Findings</h2>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ alert.assessment.findings | length }} finding{{ '' if alert.assessment.findings | length == 1 else 's' }}</span>
+                </div>
+                <div class="card-body p-0">
+                    {% for finding in alert.assessment.findings %}
+                        <div class="p-4 {% if not loop.last %}border-bottom{% endif %}">
+                            <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <span class="fw-mono fw-bold text-dark">{{ finding.rule_code }}</span>
+                                    <span class="text-secondary fs-sm"> · {{ finding.rule_name or 'Unknown rule' }}</span>
+                                    {% if finding.id == alert.triggering_finding_id %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2">Triggering finding</span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    {{ risk_badge(finding.severity) }}
+                                    {{ score_badge(finding.score) }}
+                                </div>
+                            </div>
+                            <p class="text-dark fs-sm mb-0">{{ finding.explanation }}</p>
+                            {% if finding.evidence %}
+                                <div class="mt-3">
+                                    <div class="alert-filter-label mb-1">Evidence</div>
+                                    {{ json_block(finding.evidence) }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="p-4 text-secondary fs-sm">No findings are recorded for this assessment.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Customer</h2>
+                </div>
+                <div class="card-body p-4">
+                    {% if alert.customer %}
+                        <div class="fw-bold text-dark mb-1">{{ alert.customer.name }}</div>
+                        <div class="fw-mono text-secondary fs-sm mb-3">{{ alert.customer.reference }}</div>
+                        <dl class="row mb-0 fs-sm">
+                            <dt class="col-5 text-secondary">Segment</dt>
+                            <dd class="col-7 text-dark">{{ alert.customer.risk_segment }}</dd>
+                            <dt class="col-5 text-secondary">Country</dt>
+                            <dd class="col-7 text-dark">{{ alert.customer.country_code }}</dd>
+                            <dt class="col-5 text-secondary">Active</dt>
+                            <dd class="col-7 text-dark">{{ 'Yes' if alert.customer.is_active else 'No' }}</dd>
+                            {% if alert.customer.email %}
+                                <dt class="col-5 text-secondary">Email</dt>
+                                <dd class="col-7 text-dark text-break">{{ alert.customer.email }}</dd>
+                            {% endif %}
+                            {% if alert.customer.phone %}
+                                <dt class="col-5 text-secondary">Phone</dt>
+                                <dd class="col-7 text-dark">{{ alert.customer.phone }}</dd>
+                            {% endif %}
+                        </dl>
+                    {% else %}
+                        <div class="text-secondary fs-sm">No customer is linked to this transaction.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Accounts</h2>
+                </div>
+                <div class="card-body p-4">
+                    {% if alert.transaction.debit_account %}
+                        <div class="mb-3">
+                            <div class="alert-filter-label mb-1">Debit account</div>
+                            <div class="fw-mono fw-semibold text-dark">{{ alert.transaction.debit_account.account_number }}</div>
+                            <div class="text-secondary fs-xs">
+                                {{ alert.transaction.debit_account.type }} · {{ alert.transaction.debit_account.status }} · {{ alert.transaction.debit_account.currency }} {{ alert.transaction.debit_account.formatted_balance }}
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if alert.transaction.credit_account %}
+                        <div>
+                            <div class="alert-filter-label mb-1">Credit account</div>
+                            <div class="fw-mono fw-semibold text-dark">{{ alert.transaction.credit_account.account_number }}</div>
+                            <div class="text-secondary fs-xs">
+                                {{ alert.transaction.credit_account.type }} · {{ alert.transaction.credit_account.status }} · {{ alert.transaction.credit_account.currency }} {{ alert.transaction.credit_account.formatted_balance }}
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if not alert.transaction.debit_account and not alert.transaction.credit_account %}
+                        <div class="text-secondary fs-sm">No account details are available.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom px-4 py-3">
+                    <h2 class="h5 fw-bold text-dark mb-0">Triggering Rule</h2>
+                </div>
+                <div class="card-body p-4">
+                    <div class="fw-mono fw-bold text-dark mb-1">{{ alert.triggering_rule.code }}</div>
+                    <div class="text-secondary fs-sm mb-3">{{ alert.triggering_rule.name }}</div>
+                    <dl class="row mb-0 fs-sm">
+                        <dt class="col-5 text-secondary">Version</dt>
+                        <dd class="col-7 text-dark">{{ alert.triggering_rule.version }}</dd>
+                        <dt class="col-5 text-secondary">Category</dt>
+                        <dd class="col-7 text-dark">{{ alert.triggering_rule.category }}</dd>
+                        <dt class="col-5 text-secondary">Severity</dt>
+                        <dd class="col-7">{{ risk_badge(alert.triggering_rule.severity) }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

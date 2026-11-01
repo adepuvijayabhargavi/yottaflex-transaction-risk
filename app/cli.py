@@ -264,3 +264,129 @@ def register_cli(app: Flask) -> None:
 
     app.cli.add_command(pilot_cli)
     app.cli.add_command(risk_cli)
+    app.cli.add_command(auth_cli)
+
+
+@click.group("auth")
+def auth_cli() -> None:
+    """Manage user accounts, roles, and credentials."""
+
+
+@auth_cli.command("create-user")
+@click.option(
+    "--username",
+    prompt="Username",
+    help="Unique username for the analyst or supervisor.",
+)
+@click.option(
+    "--email",
+    prompt="Email address",
+    help="Unique user email address for notifications.",
+)
+@click.option(
+    "--full-name",
+    prompt="Full name",
+    help="User full display name.",
+)
+@click.option(
+    "--role",
+    type=click.Choice(["ANALYST", "SUPERVISOR", "ADMIN"], case_sensitive=False),
+    default="ANALYST",
+    prompt="Role (ANALYST, SUPERVISOR, ADMIN)",
+    show_default=True,
+    help="User authorization role.",
+)
+@click.option(
+    "--password",
+    prompt="Password",
+    hide_input=True,
+    confirmation_prompt=True,
+    help="User account password.",
+)
+@click.option(
+    "--active/--inactive",
+    default=True,
+    help="Whether the account is active immediately.",
+)
+def create_user_command(
+    username: str,
+    email: str,
+    full_name: str,
+    role: str,
+    password: str,
+    active: bool,
+) -> None:
+    """Create a user account interactively or via command-line options."""
+    from sqlalchemy import or_, select
+
+    from app.extensions import db
+    from app.models import User
+    from app.models.enums import UserRole
+    from app.services.validation.parties import validate_user
+
+    username_clean = username.strip()
+    email_clean = email.strip().lower()
+    full_name_clean = full_name.strip()
+    role_enum = UserRole(role.upper())
+
+    if not password or len(password) < 8:
+        raise click.ClickException("Password must be at least 8 characters long.")
+
+    existing = db.session.scalar(
+        select(User).where(
+            or_(
+                User.username == username_clean,
+                User.email == email_clean,
+            )
+        )
+    )
+    if existing is not None:
+        if existing.username == username_clean:
+            raise click.ClickException(f"Username '{username_clean}' already exists.")
+        raise click.ClickException(f"Email '{email_clean}' already exists.")
+
+    user = User(
+        username=username_clean,
+        email=email_clean,
+        full_name=full_name_clean,
+        role=role_enum,
+        is_active=active,
+    )
+    user.set_password(password)
+
+    validate_user(db.session, user, record_event=False)
+
+    db.session.add(user)
+    db.session.commit()
+
+    click.echo(
+        f"User '{user.username}' ({user.role.value}) created successfully with ID {user.id}."
+    )
+
+
+@auth_cli.command("list-users")
+def list_users_command() -> None:
+    """List existing users and their roles without exposing credentials."""
+    from sqlalchemy import select
+
+    from app.extensions import db
+    from app.models import User
+
+    users = db.session.scalars(select(User).order_by(User.id)).all()
+    if not users:
+        click.echo("No users found.")
+        return
+
+    payload = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role.value if hasattr(u.role, "value") else str(u.role),
+            "is_active": u.is_active,
+            "last_login_at": (u.last_login_at.isoformat() if u.last_login_at else None),
+        }
+        for u in users
+    ]
+    _echo({"users": payload, "total": len(payload)})

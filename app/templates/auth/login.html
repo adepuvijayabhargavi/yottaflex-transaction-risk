@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — YottaFlex AI Risk Console</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body class="bg-slate-900 d-flex align-items-center justify-content-center min-vh-100 p-3">
+
+    <div class="login-wrapper w-100" style="max-width: 440px;">
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary rounded-circle mb-3 shadow-lg" style="width: 56px; height: 56px;">
+                <span class="fs-2 text-white">🛡️</span>
+            </div>
+            <h1 class="h3 fw-bold text-white mb-1">YottaFlex Risk Operations</h1>
+            <p class="text-secondary fs-sm mb-0">Sign in with authorized operations analyst credentials</p>
+        </div>
+
+        <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+            <div class="card-header bg-white py-3 px-4 border-bottom">
+                <span class="fs-xs fw-bold text-uppercase tracking-wider text-muted">Tier-1 Authentication Gate</span>
+            </div>
+
+            <div class="card-body p-4">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mb-3">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} py-2 px-3 fs-sm border" role="alert">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label for="{{ form.username.id }}" class="form-label fs-sm fw-semibold text-dark">Username or Official Email</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            <div class="text-danger fs-xs mt-1">
+                                {% for error in form.username.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.password.id }}" class="form-label fs-sm fw-semibold text-dark">Password</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                            <div class="text-danger fs-xs mt-1">
+                                {% for error in form.password.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check mb-4">
+                        {{ form.remember_me }}
+                        <label class="form-check-label fs-sm text-secondary" for="{{ form.remember_me.id }}">
+                            Remember this workstation
+                        </label>
+                    </div>
+
+                    {{ form.submit }}
+                </form>
+            </div>
+
+            <div class="card-footer bg-light px-4 py-3 border-top text-center fs-xs text-muted">
+                🔒 Protected financial risk monitoring portal. All login events, sessions, and analytical actions are audited under the append-only ledger.
+            </div>
+        </div>
+
+        <div class="text-center mt-4 text-secondary fs-xs">
+            YottaFlex AI Transaction Risk Engine &copy; 2026. Production Baseline {{ config.YTF_DASHBOARD_MODEL_VERSION }}.
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

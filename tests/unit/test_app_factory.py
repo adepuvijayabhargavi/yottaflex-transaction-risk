@@ -31,6 +31,20 @@ def test_create_app_uses_testing_configuration():
     assert app.config["WTF_CSRF_ENABLED"] is False
     assert app.config["SECRET_KEY"]
     assert app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] is False
+    assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert app.config["REMEMBER_COOKIE_HTTPONLY"] is True
+    assert app.config["YTF_DASHBOARD_MODEL_VERSION"] == "v1.0.1"
+    assert app.config["YTF_LOGIN_MAX_ATTEMPTS"] == 5
+
+
+def test_production_config_enables_secure_cookies():
+    production_config = config_by_name["production"]
+
+    assert production_config.SESSION_COOKIE_SECURE is True
+    assert production_config.REMEMBER_COOKIE_SECURE is True
+    assert production_config.SESSION_COOKIE_HTTPONLY is True
+    assert production_config.REMEMBER_COOKIE_HTTPONLY is True
 
 
 def test_create_app_registers_health_blueprint():

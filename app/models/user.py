@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from flask_login import UserMixin
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .base import Base, TimestampMixin, UTCDateTime, table_args
 from .enums import UserRole, enum_type
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from .audit import AuditEvent
 
 
-class User(TimestampMixin, Base):
+class User(UserMixin, TimestampMixin, Base):
     """A user who can review alerts and manage cases."""
 
     __tablename__ = "users"
@@ -39,3 +41,15 @@ class User(TimestampMixin, Base):
     )
 
     __table_args__ = table_args()
+
+    def set_password(self, password: str) -> None:
+        """Hash and store the user password."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        """Verify the password against the stored hash."""
+        return check_password_hash(self.password_hash, password)
+
+    def get_id(self) -> str:
+        """Return the user ID string representation for Flask-Login."""
+        return str(self.id)

@@ -1,0 +1,41 @@
+{% macro priority_badge(priority) -%}
+    {% set classes = {
+        'CRITICAL': 'bg-danger',
+        'HIGH': 'bg-warning text-dark',
+        'MEDIUM': 'bg-info text-dark',
+        'LOW': 'bg-secondary'
+    } %}
+    <span class="badge {{ classes.get(priority, 'bg-secondary') }}">{{ priority }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+    {% set classes = {
+        'OPEN': 'bg-danger-subtle text-danger border border-danger-subtle',
+        'ACKNOWLEDGED': 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        'CLOSED': 'bg-success-subtle text-success border border-success-subtle',
+        'DISMISSED': 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+    } %}
+    <span class="badge {{ classes.get(status, 'bg-secondary-subtle text-secondary border') }}">{{ status }}</span>
+{%- endmacro %}
+
+{% macro risk_badge(risk_level) -%}
+    {% set classes = {
+        'CRITICAL': 'bg-danger',
+        'HIGH': 'bg-warning text-dark',
+        'MEDIUM': 'bg-info text-dark',
+        'LOW': 'bg-success'
+    } %}
+    <span class="badge {{ classes.get(risk_level, 'bg-secondary') }}">{{ risk_level }}</span>
+{%- endmacro %}
+
+{% macro score_badge(score) -%}
+    <span class="badge {% if score >= 80 %}bg-danger{% elif score >= 60 %}bg-warning text-dark{% elif score >= 40 %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ score }}</span>
+{%- endmacro %}
+
+{% macro utc_datetime(value) -%}
+    {% if value %}{{ value[:19].replace('T', ' ') }} UTC{% else %}N/A{% endif %}
+{%- endmacro %}
+
+{% macro json_block(value) -%}
+    <pre class="alert-json-block mb-0">{{ value | tojson }}</pre>
+{%- endmacro %}

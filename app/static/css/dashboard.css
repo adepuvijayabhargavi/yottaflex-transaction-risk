@@ -1,0 +1,182 @@
+/* YottaFlex Financial Operations Dashboard Theme */
+
+.bg-slate-900 {
+    background-color: #0f172a !important;
+}
+
+.fw-mono {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.85em;
+    letter-spacing: -0.02em;
+}
+
+/* Application Layout Container */
+.app-layout {
+    display: flex;
+    min-height: calc(100vh - 57px);
+}
+
+/* Sidebar Styles */
+.app-sidebar {
+    width: 260px;
+    background-color: #0f172a;
+    color: #94a3b8;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #1e293b;
+    position: sticky;
+    top: 57px;
+    height: calc(100vh - 57px);
+}
+
+.sidebar-logo-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.sidebar-heading {
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.nav-item-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.nav-item-link:hover {
+    color: #f8fafc;
+    background-color: #1e293b;
+    text-decoration: none;
+}
+
+.nav-item-link.active {
+    color: #fff;
+    background-color: rgba(2, 132, 199, 0.15);
+    border-left-color: #0284c7;
+    font-weight: 600;
+}
+
+.nav-item-link.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.nav-item-link .nav-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* Topbar & User Profile */
+.topbar {
+    z-index: 1020;
+    height: 57px;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #10b981;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.role-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: #fff;
+}
+.role-avatar.analyst { background-color: #0284c7; }
+.role-avatar.supervisor { background-color: #7c3aed; }
+.role-avatar.admin { background-color: #ea580c; }
+
+/* Main Viewport */
+.app-main {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #f8fafc;
+}
+
+/* KPI Cards */
+.kpi-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.kpi-icon-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.kpi-metric {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* Alert Management */
+.alert-filter-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.alert-summary-text {
+    max-width: 22rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.alert-json-block {
+    max-height: 18rem;
+    overflow: auto;
+    padding: 0.85rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background-color: #f8fafc;
+    color: #334155;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 767.98px) {
+    .app-sidebar {
+        display: none;
+    }
+}
