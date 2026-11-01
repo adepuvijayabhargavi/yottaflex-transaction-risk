@@ -550,6 +550,12 @@ def claim_case(session: Session, case_id: int, actor: User) -> Case | None:
     case = _get_case_for_update(session, case_id)
     if case is None:
         return None
+    if case.assigned_to_user_id is not None and case.assigned_to_user_id != actor.id:
+        _raise_workflow_error(
+            "CASE_ALREADY_ASSIGNED",
+            "Only an unassigned case can be claimed.",
+            case_id=case.id,
+        )
     if case.status == CaseStatus.CLOSED:
         _raise_workflow_error("CASE_CLOSED", "A closed case cannot be claimed.")
     if case.assigned_to_user_id is not None:

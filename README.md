@@ -35,6 +35,13 @@ Open:
 
 - `http://127.0.0.1:5000/health`
 - `http://127.0.0.1:5000/api/v1/health`
+- `http://127.0.0.1:5000/api/v1/csrf-token` (after signing in)
+
+The authenticated Phase 6.5 JSON API provides alert review, read-only
+transaction investigation, and case-management endpoints under `/api/v1`.
+It uses the existing Flask session, global CSRF protection for mutations, and
+the configured application database session. See [docs/api.md](docs/api.md)
+for endpoint details, request examples, permissions, and response formats.
 
 ## Role-Specific Database URLs
 
@@ -129,9 +136,11 @@ The transaction lookup is available at `/transactions/`, transaction detail at
 `/transactions/<transaction_id>`, and account history at
 `/transactions/accounts/<account_id>`. These views use the application database
 session and stored core records only; they do not access evaluation or
-ground-truth data or rerun risk assessments. Alert-management API endpoints
-remain unimplemented. Phase 6.4 case management uses the existing case,
-case-alert, note, decision, and audit tables without a schema migration.
+ground-truth data or rerun risk assessments. Phase 6.5 adds the authenticated
+versioned API for alert review, transaction investigation, and case management
+without changing the existing workflows. Phase 6.4 case management uses the
+existing case, case-alert, note, decision, and audit tables without a schema
+migration.
 Analysts see their assigned and unassigned cases, while supervisors and admins
 have cross-case oversight; only managers can change priority, escalate, or
 close. Alert links are retained as history when unlinked, and each successful
