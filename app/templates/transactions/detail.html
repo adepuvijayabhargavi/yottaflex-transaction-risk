@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% from "alerts/_macros.html" import risk_badge, score_badge, status_badge, utc_datetime, json_block %}
+
+{% block title %}{% if view_mode == 'search' %}Transaction Investigation{% elif view_mode == 'account_history' %}Account History{% else %}{{ investigation.transaction.reference }}{% endif %} - Transaction Investigation{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    {% if view_mode == 'search' %}
+        <div class="row justify-content-center">
+            <div class="col-12 col-xl-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4 p-md-5">
+                        <h1 class="h3 fw-bold mb-2">Transaction investigation</h1>
+                        <p class="text-secondary">Search by exact transaction reference or numeric transaction ID.</p>
+                        <form method="get" action="{{ url_for('transactions.index') }}" class="row g-2">
+                            <div class="col"><label class="visually-hidden" for="transaction-query">Transaction reference or ID</label><input id="transaction-query" name="q" value="{{ query }}" class="form-control" maxlength="40" required></div>
+                            <div class="col-auto"><button class="btn btn-primary" type="submit">Find transaction</button></div>
+                        </form>
+                        {% if no_results %}<p class="alert alert-warning mt-3 mb-0" role="status">No transaction matches that reference or ID.</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% elif view_mode == 'account_history' %}
+        <div class="mb-4">
+            <a href="{{ url_for('transactions.index') }}" class="text-decoration-none fs-sm fw-semibold">&larr; Transaction investigation</a>
+            <h1 class="h3 fw-bold text-dark mt-2 mb-1">Account transaction history</h1>
+            <p class="text-secondary mb-0">{{ history.account.number }} · {{ history.account.type }} · {{ history.account.status }}</p>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white px-4 py-3">
+                <h2 class="h5 fw-bold mb-0">Activity · {{ history.pagination.total }} transaction{{ '' if history.pagination.total == 1 else 's' }}</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Occurred (UTC)</th><th>Reference</th><th>Direction</th><th>Counterparty</th><th>Status</th><th class="text-end">Amount</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in history["items"] %}
+                            <tr>
+                                <td>{{ utc_datetime(item.occurred_at) }}</td>
+                                <td><a href="{{ url_for('transactions.detail', transaction_id=item.id) }}" class="fw-mono">{{ item.reference }}</a></td>
+                                <td>{{ item.direction }}</td>
+                                <td>{{ item.counterparty.number if item.counterparty else 'External party' }}</td>
+                                <td>{{ item.status }}</td>
+                                <td class="text-end fw-semibold">{{ item.currency }} {{ item.amount }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="6" class="text-center text-secondary py-4">No transactions are recorded for this account.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                <span class="text-secondary fs-sm">Page {{ history.pagination.page }} of {{ history.pagination.pages }}</span>
+                <div class="d-flex gap-2">
+                    {% if history.pagination.has_prev %}
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('transactions.account_history', account_id=history.account.id, page=history.pagination.prev_page, per_page=history.pagination.per_page) }}">Previous</a>
+                    {% endif %}
+                    {% if history.pagination.has_next %}
+                        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('transactions.account_history', account_id=history.account.id, page=history.pagination.next_page, per_page=history.pagination.per_page) }}">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        {% set transaction = investigation.transaction %}
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+            <div>
+                <a href="{{ url_for('transactions.index') }}" class="text-decoration-none fs-sm fw-semibold">&larr; Transaction investigation</a>
+                <h1 class="h3 fw-bold text-dark mt-2 mb-1">Transaction {{ transaction.reference }}</h1>
+                <p class="text-secondary mb-0">{{ transaction.description or 'Transaction investigation' }}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-start">
+                <span class="badge bg-light text-dark border">{{ transaction.type }}</span>
+                <span class="badge bg-light text-dark border">Current status: {{ transaction.status }}</span>
+                {% if investigation.assessments %}
+                    {{ risk_badge(investigation.assessments[0].risk_level) }}
+                    {{ score_badge(investigation.assessments[0].score) }}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Amount</div><div class="h5 fw-bold mb-0">{{ transaction.currency }} {{ transaction.amount }}</div></div></div></div>
+            <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Occurred (UTC)</div><div class="fw-semibold">{{ utc_datetime(transaction.occurred_at) }}</div></div></div></div>
+            <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Assessment versions</div><div class="h5 fw-bold mb-0">{{ investigation.assessments | length }}</div></div></div></div>
+            <div class="col-6 col-xl-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-secondary fs-xs text-uppercase">Linked alerts</div><div class="h5 fw-bold mb-0">{{ investigation.alerts | length }}</div></div></div></div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-8">
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3"><h2 class="h5 fw-bold mb-0">Transaction and parties</h2></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for label, account in [('Debit account', transaction.debit_account), ('Credit account', transaction.credit_account)] %}
+                                {% if account %}
+                                    <div class="col-12 col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="text-secondary fs-xs text-uppercase">{{ label }}</div>
+                                            <a href="{{ url_for('transactions.account_history', account_id=account.id) }}" class="fw-semibold">{{ account.number }} · {{ account.type }}</a>
+                                            <div class="text-secondary fs-sm">{{ account.status }} · {{ account.currency }}</div>
+                                            {% if account.customer %}
+                                                <div class="mt-2">{{ account.customer.name }} <span class="text-secondary">({{ account.customer.reference }})</span></div>
+                                            {% endif %}
+                                            <a class="btn btn-link btn-sm px-0" href="{{ url_for('transactions.account_history', account_id=account.id) }}">View account history</a>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% if investigation.merchant %}
+                                <div class="col-12 col-md-6"><div class="border rounded p-3 h-100"><div class="text-secondary fs-xs text-uppercase">Merchant</div><div class="fw-semibold">{{ investigation.merchant.name }}</div><div class="text-secondary fs-sm">{{ investigation.merchant.category or 'Uncategorized' }} · {{ investigation.merchant.country_code }} · {{ investigation.merchant.risk_level }} risk</div></div></div>
+                            {% endif %}
+                            {% if investigation.device %}
+                                <div class="col-12 col-md-6"><div class="border rounded p-3 h-100"><div class="text-secondary fs-xs text-uppercase">Device</div><div class="fw-semibold">{{ investigation.device.type }} · {{ 'Trusted' if investigation.device.trusted else 'Untrusted' }}</div><div class="text-secondary fs-sm">First seen {{ utc_datetime(investigation.device.first_seen_at) }}</div></div></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3 d-flex justify-content-between"><h2 class="h5 fw-bold mb-0">Transfer relationship</h2><span class="badge bg-light text-secondary border">Read-only</span></div>
+                    <div class="card-body">
+                        {% if investigation.transfer_group %}
+                            <p class="text-secondary fs-sm">Transfer {{ investigation.transfer_group.reference }} · {{ investigation.transfer_group.status }} · Expected {{ investigation.transfer_group.currency }} {{ investigation.transfer_group.expected_total }} / actual {{ investigation.transfer_group.actual_total }}</p>
+                        {% endif %}
+                        {% if investigation.transfer_legs %}
+                            {% if investigation.transfer_legs_pagination.truncated %}
+                                <p class="alert alert-info py-2 fs-sm" role="status">Showing {{ investigation.transfer_legs_pagination.shown }} of {{ investigation.transfer_legs_pagination.total }} transfer legs (maximum {{ investigation.transfer_legs_pagination.limit }}).</p>
+                            {% endif %}
+                            <div class="d-flex flex-column gap-2" aria-label="Transfer transaction legs">
+                                {% for leg in investigation.transfer_legs %}
+                                    <div class="border rounded p-3 d-flex flex-column flex-md-row align-items-md-center gap-2">
+                                        <span class="badge bg-light text-dark border">{{ leg.type }}</span>
+                                        <a href="{{ url_for('transactions.detail', transaction_id=leg.id) }}" class="fw-mono fw-semibold">{{ leg.reference }}</a>
+                                        <span class="text-secondary">{{ leg.debit_account.number if leg.debit_account else 'External' }} <span aria-hidden="true">&rarr;</span> {{ leg.credit_account.number if leg.credit_account else 'External' }}</span>
+                                        <span class="ms-md-auto fw-semibold">{{ leg.currency }} {{ leg.amount }}</span>
+                                        <span class="text-secondary fs-xs">{{ utc_datetime(leg.occurred_at) }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No linked transfer group or transfer legs are recorded.</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3"><h2 class="h5 fw-bold mb-0">Account activity</h2></div>
+                    <div class="card-body">
+                        {% for account_history in investigation.account_histories %}
+                            <div class="{% if not loop.last %}mb-4{% endif %}">
+                                <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                                    <h3 class="h6 fw-bold mb-0">{{ account_history.account.number }}</h3>
+                                    <a href="{{ url_for('transactions.account_history', account_id=account_history.account.id) }}" class="fs-sm">View full history</a>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead><tr><th>Occurred (UTC)</th><th>Reference</th><th>Type</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                                        <tbody>
+                                            {% for item in account_history.transactions %}
+                                                <tr><td>{{ utc_datetime(item.occurred_at) }}</td><td><a href="{{ url_for('transactions.detail', transaction_id=item.id) }}" class="fw-mono">{{ item.reference }}</a></td><td>{{ item.type }}</td><td>{{ item.status }}</td><td class="text-end">{{ item.currency }} {{ item.amount }}</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No account is linked to this transaction.</p>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3"><h2 class="h5 fw-bold mb-0">Related transactions</h2></div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light"><tr><th>Reference</th><th>Occurred (UTC)</th><th>Amount</th><th>Relationship</th></tr></thead>
+                            <tbody>
+                                {% for item in investigation.related_transactions %}
+                                    <tr><td><a class="fw-mono" href="{{ url_for('transactions.detail', transaction_id=item.id) }}">{{ item.reference }}</a></td><td>{{ utc_datetime(item.occurred_at) }}</td><td>{{ item.currency }} {{ item.amount }}</td><td>{% for reason in item.reasons %}<span class="badge bg-light text-dark border me-1">{{ reason }}</span>{% endfor %}</td></tr>
+                                {% else %}
+                                    <tr><td colspan="4" class="text-center text-secondary py-4">No related transactions were found from recorded links and evidence.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3 d-flex justify-content-between"><h2 class="h5 fw-bold mb-0">Risk findings</h2><span class="badge bg-light text-secondary border">Stored assessments · read-only</span></div>
+                    <div class="card-body">
+                        {% for assessment in investigation.assessments %}
+                            <div class="{% if not loop.last %}border-bottom pb-3 mb-3{% endif %}">
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    <span class="fw-semibold">{{ assessment.model_version }}</span>
+                                    {{ risk_badge(assessment.risk_level) }}
+                                    {{ score_badge(assessment.score) }}
+                                    <span class="text-secondary fs-xs">{{ utc_datetime(assessment.assessed_at) }}</span>
+                                </div>
+                                {% if assessment.explanation %}{{ json_block(assessment.explanation) }}{% endif %}
+                                {% for finding in assessment.findings %}
+                                    <div class="border rounded p-3 mt-2">
+                                        <div class="d-flex flex-wrap justify-content-between gap-2"><strong>{{ finding.rule_code }}{% if finding.rule_name %} · {{ finding.rule_name }}{% endif %}</strong><span>{{ risk_badge(finding.severity) }} {{ score_badge(finding.score) }}</span></div>
+                                        <p class="mb-0 mt-2">{{ finding.explanation }}</p>
+                                        {% if finding.evidence %}<div class="mt-2">{{ json_block(finding.evidence) }}</div>{% endif %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-secondary fs-sm mb-0">No findings are recorded for this assessment.</p>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No risk assessment is recorded for this transaction.</p>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-4">
+                <section class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white px-4 py-3"><h2 class="h5 fw-bold mb-0">Recorded timeline</h2></div>
+                    <div class="card-body">
+                        <ol class="list-unstyled mb-0">
+                            {% for event in investigation.timeline %}
+                                <li class="border-start border-2 ps-3 pb-3 position-relative">
+                                    <div class="fw-semibold">{{ event.title }}</div>
+                                    <div class="text-secondary fs-sm">{{ event.summary }}</div>
+                                    <div class="text-secondary fs-xs">{{ utc_datetime(event.timestamp) }} · {{ event.source }}</div>
+                                </li>
+                            {% else %}
+                                <li class="text-secondary">No timeline events are recorded.</li>
+                            {% endfor %}
+                        </ol>
+                        <p class="text-secondary fs-xs mt-3 mb-0">Timeline entries are persisted historical records only; the transaction status shown above is its current stored status, not a recorded historical status change. Missing history is not inferred.</p>
+                    </div>
+                </section>
+
+                {% if investigation.alerts %}
+                    <section class="card border-0 shadow-sm">
+                        <div class="card-header bg-white px-4 py-3"><h2 class="h5 fw-bold mb-0">Linked alerts</h2></div>
+                        <div class="list-group list-group-flush">
+                            {% for alert in investigation.alerts %}
+                                <a class="list-group-item list-group-item-action" href="{{ url_for('alerts.detail', alert_id=alert.id) }}">
+                                    <div class="d-flex justify-content-between"><strong>{{ alert.reference }}</strong>{{ status_badge(alert.status) }}</div>
+                                    <div class="text-secondary fs-sm">{{ alert.summary }}</div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

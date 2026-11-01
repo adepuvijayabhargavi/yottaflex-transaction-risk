@@ -122,5 +122,12 @@ was verified. The pilot generated the approved counts, produced zero alerts,
 and reproduced identical checksums after a confirmed reset and regeneration.
 The Phase 5 risk engine and Phase 6.2 alert review workflow are implemented.
 Alert workflows provide assignment, acknowledgement, close, and dismiss actions
-with append-only audit events. Alert-management API endpoints remain
-unimplemented.
+with append-only audit events. Phase 6.3 transaction investigation provides a
+read-only transaction detail view, account history, related transactions,
+transfer legs, risk findings, and a timeline assembled from recorded events.
+The transaction lookup is available at `/transactions/`, transaction detail at
+`/transactions/<transaction_id>`, and account history at
+`/transactions/accounts/<account_id>`. These views use the application database
+session and stored core records only; they do not access evaluation or
+ground-truth data or rerun risk assessments. Alert-management API endpoints
+remain unimplemented.

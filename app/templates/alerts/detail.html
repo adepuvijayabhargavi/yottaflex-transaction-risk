@@ -172,7 +172,7 @@
                     <div class="row g-3 fs-sm">
                         <div class="col-12 col-md-6">
                             <div class="alert-filter-label">Reference</div>
-                            <div class="fw-mono fw-semibold text-dark">{{ alert.transaction.reference }}</div>
+                            <a href="{{ url_for('transactions.detail', transaction_id=alert.transaction.id) }}" class="fw-mono fw-semibold text-decoration-none">{{ alert.transaction.reference }}</a>
                         </div>
                         <div class="col-6 col-md-3">
                             <div class="alert-filter-label">Type</div>

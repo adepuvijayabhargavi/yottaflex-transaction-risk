@@ -278,7 +278,9 @@
                                 <td class="ps-4 fw-mono fw-bold text-primary">
                                     <a href="{{ url_for('alerts.detail', alert_id=item.alert_id) }}" class="text-primary text-decoration-none">{{ item.alert_reference }}</a>
                                 </td>
-                                <td class="fw-mono text-dark">{{ item.transaction_reference }}</td>
+                                <td class="fw-mono text-dark">
+                                    <a href="{{ url_for('transactions.detail', transaction_id=item.transaction_id) }}" class="text-decoration-none">{{ item.transaction_reference }}</a>
+                                </td>
                                 <td class="text-secondary fs-xs">
                                     {{ item.occurred_at[:19].replace('T', ' ') if item.occurred_at else 'N/A' }}
                                 </td>

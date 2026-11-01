@@ -12,8 +12,6 @@ from __future__ import annotations
 import os
 from enum import StrEnum
 
-LEGACY_APP_DATABASE_URL_ENV_VAR = "YTF_DATABASE_URL"
-
 
 class DatabaseRole(StrEnum):
     """Database roles with separate credentials."""
@@ -55,9 +53,6 @@ def database_url_for_role(
     normalized_role = DatabaseRole(role)
     env_var = DATABASE_URL_ENV_VARS[normalized_role]
     value = _read_env(env_var)
-
-    if normalized_role is DatabaseRole.APP and value is None:
-        value = _read_env(LEGACY_APP_DATABASE_URL_ENV_VAR)
 
     if value is None and required:
         raise RuntimeError(f"{env_var} must be set to a role-specific database URL.")

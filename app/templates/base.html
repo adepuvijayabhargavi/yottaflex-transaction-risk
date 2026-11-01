@@ -63,10 +63,9 @@
                     <span class="nav-icon">dYs"</span>
                     <span class="nav-label">Alert Management</span>
                 </a>
-                <a href="#" class="nav-item-link disabled" title="Available in Phase 6.3">
+                <a href="{{ url_for('transactions.index') }}" class="nav-item-link {% if request.endpoint and request.endpoint.startswith('transactions.') %}active{% endif %}">
                     <span class="nav-icon">🔍</span>
                     <span class="nav-label">Transaction Deep Dive</span>
-                    <span class="badge bg-secondary ms-auto fs-xs">Phase 6.3</span>
                 </a>
 
                 <div class="sidebar-heading px-3 mt-4 mb-2 text-uppercase fs-xs text-secondary fw-bold">Case Investigation</div>

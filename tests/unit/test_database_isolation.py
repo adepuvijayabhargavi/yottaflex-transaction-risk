@@ -70,6 +70,29 @@ def test_missing_required_role_url_raises_clear_error(monkeypatch):
         database_url_for_role(DatabaseRole.RISK)
 
 
+def test_app_role_uses_only_app_database_url(monkeypatch):
+    app_url = "mysql+pymysql://app:secret@localhost/yottaflex"
+    monkeypatch.setenv("YTF_APP_DATABASE_URL", app_url)
+    monkeypatch.setenv(
+        "YTF_DATABASE_URL",
+        "mysql+pymysql://legacy:secret@localhost/legacy",
+    )
+
+    assert database_url_for_role(DatabaseRole.APP) == app_url
+
+
+def test_app_role_does_not_fall_back_to_legacy_database_url(monkeypatch):
+    monkeypatch.delenv("YTF_APP_DATABASE_URL", raising=False)
+    monkeypatch.setenv(
+        "YTF_DATABASE_URL",
+        "mysql+pymysql://legacy:secret@localhost/legacy",
+    )
+
+    assert database_url_for_role(DatabaseRole.APP, required=False) is None
+    with pytest.raises(RuntimeError, match="YTF_APP_DATABASE_URL"):
+        database_url_for_role(DatabaseRole.APP)
+
+
 def test_missing_evaluation_core_url_raises_clear_error(monkeypatch):
     monkeypatch.delenv("YTF_EVAL_CORE_DATABASE_URL", raising=False)
 
